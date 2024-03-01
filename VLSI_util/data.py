@@ -6,6 +6,7 @@ import circuitgraph as cg
 from torch_geometric.data import HeteroData,Data
 import torch
 import torch.nn.functional as F
+import torch_geometric.transforms as T
 addable_types = [
     "buf",
     "and",
@@ -53,9 +54,28 @@ def cg2hetedata(circuit_graph):
     data['node','inv','node'].edge_index = torch.tensor(edge_dict['inv'])
     return data
 
+def cg2homodata(circuit_graph):
+    G = circuit_graph.graph
+    # node attribute [#_nodes,#_gate_types]
+    node_attribute = []
+    node_index = 0
+    edge_dict = [[],[]]
+    for node in circuit_graph:
+        node_type = supported_types.index(G.nodes[node]['type'])
+        node_attribute.append(node_type)
+        G.nodes[node]['index'] = len(node_attribute) - 1
+
+    for edge in circuit_graph.edges():
+        edge_dict[0].append(G.nodes[edge[0]]['index'])
+        edge_dict[1].append(G.nodes[edge[1]]['index'])
+    data = Data()
+    data.edge_index = torch.tensor(edge_dict)
+    data.x = F.one_hot(torch.tensor(node_attribute),num_classes = len(supported_types)).float()
+    data = T.ToUndirected()(data)
+    return data
 
 if __name__ == '__main__':
     bbs =[]
     circuit = cg.from_file('../netlist_data/arith/adder_4_bit.v',blackboxes=bbs)
-    g = cg2hetedata(circuit)
+    g = cg2homodata(circuit)
     print(g)
