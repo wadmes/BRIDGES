@@ -7,9 +7,8 @@ from pytorch_lightning import Trainer, strategies
 import pytorch_lightning.callbacks as plc
 from pytorch_lightning.loggers import CSVLogger
 from model.blip2_stage1 import Blip2Stage1
-from data_provider.stage1_dm import Stage1DM
-from data_provider.stage1_kvplm_dm import Stage1KVPLMDM
-
+from VLSI_util.data_module import Stage1DM
+from VLSI_util.data import netlistDataset
 
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
 ## for pyg bug
@@ -31,11 +30,8 @@ def main(args):
     print('total params:', sum(p.numel() for p in model.parameters()))
 
     tokenizer = model.blip2qformer.tokenizer
-    # data
-    if args.root.find('kv') >= 0:
-        dm = Stage1KVPLMDM(args.num_workers, args.batch_size, args.root, args.text_max_len, args.graph_aug, args)
-    else:
-        dm = Stage1DM(args.num_workers, args.batch_size, args.root, args.text_max_len, args.graph_aug, tokenizer,
+
+    dm = Stage1DM(args.num_workers, args.batch_size, args.root, args.text_max_len, tokenizer,
                       args)
     model.val_match_loader = dm.val_match_loader
     model.test_match_loader = dm.test_match_loader
@@ -52,14 +48,7 @@ def main(args):
     else:
         strategy = 'auto'
         args.devices = eval(args.devices)
-        print(args.devices)
     logger = CSVLogger(save_dir=f'./all_checkpoints/{args.filename}/')
-    # trainer = Trainer.from_argparse_args(args,
-    #                                      callbacks=callbacks,
-    #                                      strategy=strategy,
-    #                                      logger=logger,
-    #                                     #  limit_train_batches=100,
-    #                                      )
     trainer = Trainer(accelerator=args.accelerator, devices=args.devices, precision=args.precision, max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, callbacks=callbacks, strategy=strategy, logger=logger)
     if args.mode == 'train':
         trainer.fit(model, datamodule=dm)

@@ -16,17 +16,14 @@ from lavis.common.utils import is_url
 from lavis.models.base_model import BaseModel
 from lavis.models.blip2_models.Qformer import BertConfig, BertLMHeadModel
 from transformers import BertTokenizer
-from model.gin_model import GNN
+from model.gin_model import HeteGNN
 
 
     
 class Blip2Base(BaseModel):
     @classmethod
     def init_tokenizer(cls):
-        if True:
-            bert_name = 'allenai/scibert_scivocab_uncased'
-        else:
-            bert_name = 'bert_pretrained/'
+        bert_name = 'bert-base-uncased'
         tokenizer = BertTokenizer.from_pretrained(bert_name)
         tokenizer.add_special_tokens({"bos_token": "[DEC]"})
         return tokenizer
@@ -44,15 +41,10 @@ class Blip2Base(BaseModel):
     @classmethod
     def init_Qformer(cls, model_name, num_query_token, graph_width, cross_attention_freq=2):
         assert model_name == 'scibert'
-        print("bert load scibert")
-        if True:
-            bert_name = 'allenai/scibert_scivocab_uncased'
-        else:
-            bert_name = 'bert_pretrained/'
-    
-        
+        print("load original bert")
+        bert_name = 'bert-base-uncased'
         encoder_config = BertConfig.from_pretrained(bert_name)
-        encoder_config.encoder_width = graph_width
+        encoder_config.encoder_width = graph_width # graph_width is the hidden size of the graph encoder
         # insert cross-attention layer every other block
         encoder_config.add_cross_attention = True
         encoder_config.cross_attention_freq = cross_attention_freq
@@ -71,18 +63,13 @@ class Blip2Base(BaseModel):
     @classmethod
     def init_graph_encoder(
         cls, gin_num_layers, gin_hidden_dim, gin_drop_ratio):
-        graph_encoder = GNN(
+        graph_encoder = HeteGNN(
             num_layer=gin_num_layers,
             emb_dim=gin_hidden_dim,
             gnn_type='gin',
             drop_ratio=gin_drop_ratio,
             JK='last',
         )
-        ckpt = torch.load('gin_pretrained/graphcl_80.pth', map_location=torch.device('cpu'))
-        missing_keys, unexpected_keys = graph_encoder.load_state_dict(ckpt, strict=False)
-        if len(missing_keys) or len(unexpected_keys):
-            print(missing_keys)
-            print(unexpected_keys)
         
         ln_graph = LayerNorm(graph_encoder.num_features)
             

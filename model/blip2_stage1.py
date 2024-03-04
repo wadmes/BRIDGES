@@ -53,6 +53,7 @@ class Blip2Stage1(pl.LightningModule):
             return
         if self.trainer.global_rank == 0:
             ## for validation set
+            # rec20 means recall@20 (top-20)
             g2t_acc, t2g_acc, g2t_rec20, t2g_rec20, \
             g2t_rerank_acc, t2g_rerank_acc, g2t_rerank_rec20, t2g_rerank_rec20,\
             graph_rep_total, text_rep_total, _, _, _, _ = \
