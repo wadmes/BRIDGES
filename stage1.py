@@ -48,6 +48,7 @@ def main(args):
     else:
         strategy = 'auto'
         args.devices = eval(args.devices)
+    print(f"strategy: {strategy}", ". Devices:", args.devices)
     logger = CSVLogger(save_dir=f'./all_checkpoints/{args.filename}/')
     trainer = Trainer(accelerator=args.accelerator, devices=args.devices, precision=args.precision, max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, callbacks=callbacks, strategy=strategy, logger=logger)
     if args.mode == 'train':

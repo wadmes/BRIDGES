@@ -162,11 +162,12 @@ class Blip2Qformer(Blip2Base):
         num_query_token=32,
         cross_attention_freq=2,
         embed_dim=256,
+        multiple_device = False
     ):
         super().__init__()
         self.gtm = gtm
         self.lm = lm
-        
+        self.multiple_device = multiple_device
         self.tokenizer = self.init_tokenizer()
 
         self.graph_encoder, self.ln_graph = self.init_graph_encoder(gin_num_layers, gin_hidden_dim, gin_drop_ratio)
@@ -196,23 +197,23 @@ class Blip2Qformer(Blip2Base):
     
     def contrast(self, features_graph, features_text, return_sim=False):
         '''
-        features_graph: shape = [B, num_qs, D]
+        features_graph: shape = [B, num_qs, D] num_qs is the number of query tokens
         features_text: shape = [B, D]
         '''
         batch_size = features_graph.size(0)
 
         # normalized features
-        features_graph = F.normalize(features_graph, dim=-1)
-        features_text = F.normalize(features_text, dim=-1)
+        features_graph = F.normalize(features_graph, dim=-1)  # shape = [B, num_qs, D]
+        features_text = F.normalize(features_text, dim=-1) # shape = [B, D]
 
         # cosine similarity as logits
         sim_q2t = (features_graph.unsqueeze(1) @ features_text.unsqueeze(-1)).squeeze() # shape = [B, 1, num_qs, D]; shape = [B, D, 1]; output shape = [B, B, num_qs]
         sim_g2t, _ = sim_q2t.max(-1) # shape = [B, B]
 
-        logits_per_graph = sim_g2t / self.temperature
+        logits_per_graph = sim_g2t / self.temperature # shape = [B, B]
         logits_per_text = logits_per_graph.t()
 
-        labels = torch.arange(batch_size, dtype=torch.long, device=self.device)  # 大小为B
+        labels = torch.arange(batch_size, dtype=torch.long, device=self.device)  # 大小为B, the first graph should be similar with the first text, and so on
         loss_graph = F.cross_entropy(logits_per_graph, labels)
         loss_text = F.cross_entropy(logits_per_text, labels)
         loss = (loss_graph + loss_text) / 2
@@ -243,15 +244,21 @@ class Blip2Qformer(Blip2Base):
         logits_per_text = sim_t2g / self.temperature
 
         # labels = torch.arange(bs, dtype=torch.long, device=self.device)
-        rank = dist.get_rank()
-        labels = torch.linspace(rank * bs, rank * bs + bs - 1, bs, dtype=int).to(self.device)
+        if self.multiple_device:
+            rank = dist.get_rank()
+            labels = torch.linspace(rank * bs, rank * bs + bs - 1, bs, dtype=int).to(self.device)
+        else:
+            labels = torch.arange(bs, dtype=torch.long, device=self.device)
 
         loss_graph = F.cross_entropy(logits_per_graph, labels)
         loss_text = F.cross_entropy(logits_per_text, labels)
         loss = (loss_graph + loss_text) / 2
 
         if return_sim:
-            return logits_per_graph[:, rank*bs:rank*bs+bs], logits_per_text[:, rank*bs:rank*bs+bs], loss
+            if self.multiple_device:
+                return logits_per_graph[:, rank*bs:rank*bs+bs], logits_per_text[:, rank*bs:rank*bs+bs], loss
+            else:
+                return logits_per_graph, logits_per_text, loss
         else:
             return loss
         
