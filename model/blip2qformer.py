@@ -290,7 +290,7 @@ class Blip2Qformer(Blip2Base):
         sim_g2t, sim_t2g, loss_gtc = self.contrast_global(graph_feats, text_feats, graph_feats_all, text_feats_all, return_sim=True)
 
 
-        ###============== Image-text Matching ===================###
+        ###============== Graph-text Matching ===================###
         loss_gtm = 0
         if self.gtm:
             ## not aggregate global tensor because of their different shapes
@@ -360,7 +360,7 @@ class Blip2Qformer(Blip2Base):
             ).to(text.device)
             loss_gtm = F.cross_entropy(logits, itm_labels)
 
-        ##================= Image Captioning ========================##
+        ##================= Graph Captioning ========================##
         loss_lm = 0
         if self.lm:
             decoder_input_ids = text.clone()

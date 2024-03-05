@@ -152,9 +152,9 @@ class Blip2OPT(Blip2Base):
         ## initialize opt model
         self.opt_tokenizer = AutoTokenizer.from_pretrained(opt_model, use_fast=False, padding_side='right')
         self.opt_tokenizer.add_special_tokens({'pad_token': '<pad>'})
-        self.opt_tokenizer.add_tokens('<mol>') # molecule placeholder
-        self.mol_token = '<mol>'
-        self.opt_tokenizer.mol_token_id = self.opt_tokenizer("<mol>", add_special_tokens=False).input_ids[0]
+        self.opt_tokenizer.add_tokens('<graph>') # molecule placeholder
+        self.mol_token = '<graph>'
+        self.opt_tokenizer.mol_token_id = self.opt_tokenizer("<graph>", add_special_tokens=False).input_ids[0]
 
         self.collater = Collater([], [])
         
@@ -165,6 +165,8 @@ class Blip2OPT(Blip2Base):
                 self.opt_model = OPTForCausalLM.from_pretrained(opt_model, torch_dtype=torch.bfloat16)
             else:
                 self.opt_model = OPTForCausalLM.from_pretrained(opt_model, torch_dtype=torch.float16)
+        
+        # this is to tell the model to use the new token
         self.opt_model.resize_token_embeddings(len(self.opt_tokenizer)) ## this will cause bug when full fine-tuning the opt model
 
         self.llm_tune = llm_tune
@@ -201,48 +203,9 @@ class Blip2OPT(Blip2Base):
         # prompt_tokens = self.opt_tokenizer(self.prompt, return_tensors="pt")
         # self.prompt_length = prompt_tokens.attention_mask.sum(1)
 
-    def forward_old(self, batch):
-        graphs, text_tokens, prompt_lens = batch
-        graph_embeds, graph_masks = self.graph_encoder(graphs)
-        if not self.tune_gnn:
-            graph_embeds = graph_embeds.detach()
-        graph_embeds = self.ln_graph(graph_embeds, graph_masks)
-        device = graph_embeds.device
-        query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
-        query_output = self.Qformer.bert(
-            query_embeds=query_tokens,
-            encoder_hidden_states=graph_embeds,
-            encoder_attention_mask=graph_masks, # fixme: check whether this mask is correct
-            return_dict=True,
-        )
-        inputs_opt = self.opt_proj(query_output.last_hidden_state)
-        atts_opt = torch.ones(inputs_opt.size()[:-1], dtype=torch.long).to(device)
-        targets = text_tokens.input_ids.masked_fill(
-            text_tokens.input_ids == self.opt_tokenizer.pad_token_id, -100
-        )
-        if self.prompt:
-            targets = mask_by_len(targets, prompt_lens, -100) # do not apply loss to the prompt
-            # targets[:, : self.prompt_length] = -100  # do not apply loss to the prompt
-        
-        empty_targets = (
-            torch.ones(atts_opt.size(), dtype=torch.long).to(device).fill_(-100)
-        )
-        targets = torch.cat([empty_targets, targets], dim=1)
-        
-        inputs_embeds = self.opt_model.get_input_embeddings()(text_tokens.input_ids)
-        inputs_embeds = torch.cat([inputs_opt, inputs_embeds], dim=1)
-        attention_mask = torch.cat([atts_opt, text_tokens.attention_mask], dim=1)
-        
-        outputs = self.opt_model(
-            inputs_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            return_dict=True,
-            labels=targets,
-        )
-        loss = outputs.loss
-        return {"loss": loss}
-    
+
     def forward(self, batch):
+        # graphs, smiles_prompt_tokens, text_tokens
         graphs, prompt_tokens, text_tokens = batch
         graph_embeds, graph_masks = self.graph_encoder(graphs)
         if not self.tune_gnn:
@@ -265,7 +228,7 @@ class Blip2OPT(Blip2Base):
         targets = torch.cat([empty_targets, targets], dim=1)
 
         prompt_embeds = self.opt_model.get_input_embeddings()(prompt_tokens.input_ids)
-        prompt_embeds[prompt_tokens.is_mol_token] = mol_tokens.flatten(0, 1)
+        prompt_embeds[prompt_tokens.is_mol_token] = mol_tokens.flatten(0, 1) # change mol placeholder to the actual mol tokens from graph
         inputs_embeds = self.opt_model.get_input_embeddings()(text_tokens.input_ids)
         inputs_embeds = torch.cat((prompt_embeds, inputs_embeds), dim=1)
         attention_mask = torch.cat([prompt_tokens.attention_mask, text_tokens.attention_mask], dim=1)
@@ -327,78 +290,6 @@ class Blip2OPT(Blip2Base):
         loss = outputs.loss
         return {"loss": loss}
 
-    @torch.no_grad()
-    def generate_old(
-        self,
-        samples,
-        do_sample=False,
-        num_beams=5,
-        max_length=128,
-        min_length=1,
-        top_p=0.9,
-        repetition_penalty=1.0,
-        length_penalty=1.0,
-        num_captions=1,
-        temperature=1,
-    ):
-        """
-        Args:
-            samples (dict): A dictionary containing the following keys:
-                - image (torch.Tensor): A tensor of shape (batch_size, 3, H, W)
-            num_beams (int): Number of beams for beam search. 1 means no beam search.
-            max_length (int): The maximum length of the sequence to be generated.
-            min_length (int): The minimum length of the sequence to be generated.
-            top_p (float): The cumulative probability for nucleus sampling.
-            repetition_penalty (float): The parameter for repetition penalty. 1.0 means no penalty.
-            num_captions (int): Number of captions to be generated for each image.
-        Returns:
-            captions (list): A list of strings of length batch_size * num_captions.
-        """
-        graphs = samples['graphs']
-        prompt_tokens = samples['prompt_tokens']
-        # prompt_lens = samples['prompt_lens']
-        with self.maybe_autocast():
-            graph_embeds, graph_masks = self.graph_encoder(graphs)
-            graph_embeds = self.ln_graph(graph_embeds)
-
-            query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
-            query_output = self.Qformer.bert(
-                query_embeds=query_tokens,
-                encoder_hidden_states=graph_embeds,
-                encoder_attention_mask=graph_masks,
-                return_dict=True,
-            )
-
-            device = graph_embeds.device
-            inputs_opt = self.opt_proj(query_output.last_hidden_state)
-            atts_opt = torch.ones(inputs_opt.size()[:-1], dtype=torch.long, device=device)
-
-            attention_mask = torch.cat([atts_opt, prompt_tokens.attention_mask], dim=1)
-            
-            inputs_embeds = self.opt_model.get_input_embeddings()(prompt_tokens.input_ids)
-            inputs_embeds = torch.cat([inputs_opt, inputs_embeds], dim=1)
-
-            outputs = self.opt_model.generate(
-                inputs_embeds=inputs_embeds,
-                attention_mask=attention_mask,
-                do_sample=do_sample,
-                top_p=top_p,
-                temperature=temperature,
-                num_beams=num_beams,
-                max_length=max_length,
-                min_length=min_length,
-                # pad_token_id=self.pad_token_id,
-                eos_token_id=self.eos_token_id,
-                repetition_penalty=repetition_penalty,
-                length_penalty=length_penalty,
-                num_return_sequences=num_captions,
-                # use_cache=False,
-            )
-            output_text = self.opt_tokenizer.batch_decode(outputs, skip_special_tokens=True)
-            
-            output_text = [text.strip() for text in output_text]
-            return output_text
-    
     @torch.no_grad()
     def generate(
         self,

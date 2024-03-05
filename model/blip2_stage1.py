@@ -151,7 +151,7 @@ class Blip2Stage1(pl.LightningModule):
         parser.add_argument('--lr_decay_rate', type=float, default=0.9, help='optimizer lr decay rate')
         parser.add_argument('--scheduler', type=str, default='linear_warmup_cosine_lr', help='type of scheduler') # or linear_warmup_step_lr
         parser.add_argument('--init_checkpoint', type=str, default='')
-        parser.add_argument('--retrieval_eval_epoch', type=int, default=10)
+        parser.add_argument('--retrieval_eval_epoch', type=int, default=50)
         return parent_parser
 
 
@@ -263,7 +263,7 @@ def eval_retrieval_fullset(graph_rep, text_rep, device):
     for i in range(0, N, B):
         sorted_ids = torch.argsort(sim_g2t[i:i+B].to(device), descending=True)
         rank_g2t.append((sorted_ids == torch.arange(i,i+sorted_ids.shape[0], device=device).reshape(-1, 1)).int().argmax(dim=-1))
-    rank_g2t = torch.cat(rank_g2t, dim=0)
+    rank_g2t = torch.cat(rank_g2t, dim=0) 
     
     rank_t2g = []
     for i in range(0, N, B):

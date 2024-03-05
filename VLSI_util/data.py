@@ -89,20 +89,19 @@ class netlistDataset(InMemoryDataset):
         self.type = type
         for file in os.listdir(path):
             if file.endswith('.v'):
-                for i in range(50): # repeat each netlist for 50 times, should be removed in the future
-                    # file is {module type}_{bit number}_bit.v
-                    module_type = file.split('_')[0]
-                    bit_number = file.split('_')[1]
-                    bbs = []
-                    circuit = cg.from_file(os.path.join(path,file),blackboxes=bbs)
-                    if type == 'hetedata':
-                        self.graphs.append(cg2hetedata(circuit))
-                    elif type == 'homodata':
-                        self.graphs.append(cg2homodata(circuit))
-                    else:
-                        raise NotImplementedError
-                    description = "The logic netlist is a {}-bit {} module.".format(bit_number,module_type)
-                    self.graphs[-1].text = description
+                # file is {module type}_{bit number}_bit.v
+                module_type = file.split('_')[0]
+                bit_number = file.split('_')[1]
+                bbs = []
+                circuit = cg.from_file(os.path.join(path,file),blackboxes=bbs)
+                if type == 'hetedata':
+                    self.graphs.append(cg2hetedata(circuit))
+                elif type == 'homodata':
+                    self.graphs.append(cg2homodata(circuit))
+                else:
+                    raise NotImplementedError
+                description = "The logic netlist is a {}-bit {} module.".format(bit_number,module_type)
+                self.graphs[-1].text = description
     def len(self):
         return len(self.graphs)
 

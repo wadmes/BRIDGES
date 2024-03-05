@@ -29,7 +29,7 @@ def molecule_caption(smiles, prompt, temperature):
 
     ## process smiles prompt
     prompt = '[START_I_SMILES]{}[END_I_SMILES]. '.format(smiles[:256]) + prompt
-    prompt = smiles_handler(prompt, '<mol>' * 8, True)[0]
+    prompt = smiles_handler(prompt, '<graph>' * 8, True)[0]
     molca.opt_tokenizer.padding_side = 'left'
     prompt_batch = molca.opt_tokenizer([prompt, ],
                                        truncation=True,

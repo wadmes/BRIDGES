@@ -71,9 +71,9 @@ class Blip2T5(Blip2Base):
         ## initialize opt model
         # self.opt_tokenizer = AutoTokenizer.from_pretrained(opt_model)
         self.opt_tokenizer = T5TokenizerFast.from_pretrained(opt_model)
-        self.opt_tokenizer.add_tokens('<mol>') # molecule placeholder
-        self.mol_token = '<mol>'
-        self.opt_tokenizer.mol_token_id = self.opt_tokenizer("<mol>", add_special_tokens=False).input_ids[0]
+        self.opt_tokenizer.add_tokens('<graph>') # molecule placeholder
+        self.mol_token = '<graph>'
+        self.opt_tokenizer.mol_token_id = self.opt_tokenizer("<graph>", add_special_tokens=False).input_ids[0]
         
         self.opt_model = T5ForConditionalGeneration.from_pretrained('laituan245/molt5-large', torch_dtype=torch.float32)
         self.opt_model.resize_token_embeddings(len(self.opt_tokenizer)) ## this will cause bug when full fine-tuning the opt model
