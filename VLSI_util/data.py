@@ -5,7 +5,6 @@ The data utilization module for VLSI data processing.
 import circuitgraph as cg
 from torch_geometric.data import HeteroData,Data,InMemoryDataset
 import torch
-import torch.nn.functional as F
 import torch_geometric.transforms as T
 import os
 addable_types = [
@@ -87,12 +86,13 @@ class netlistDataset(InMemoryDataset):
         # for each .v file in path
         self.graphs = []
         self.type = type
+        bbs = []
         for file in os.listdir(path):
             if file.endswith('.v'):
                 # file is {module type}_{bit number}_bit.v
                 module_type = file.split('_')[0]
                 bit_number = file.split('_')[1]
-                bbs = []
+                
                 circuit = cg.from_file(os.path.join(path,file),blackboxes=bbs)
                 if type == 'hetedata':
                     self.graphs.append(cg2hetedata(circuit))
@@ -100,7 +100,7 @@ class netlistDataset(InMemoryDataset):
                     self.graphs.append(cg2homodata(circuit))
                 else:
                     raise NotImplementedError
-                description = "The logic netlist is a {}-bit {} module.".format(bit_number,module_type)
+                description = "{}-bit {}".format(bit_number,module_type)
                 self.graphs[-1].text = description
     def len(self):
         return len(self.graphs)

@@ -145,7 +145,7 @@ class Stage2DM(LightningDataModule):
         mode: str = 'pretrain',
         num_workers: int = 0,
         batch_size: int = 256,
-        root: str = 'data/',
+        root: str = './data/',
         text_max_len: int = 128,
         tokenizer=None,
         args=None,
@@ -253,7 +253,7 @@ class Stage2DM(LightningDataModule):
         parser.add_argument('--batch_size', type=int, default=32)
         parser.add_argument('--inference_batch_size', type=int, default=4)
         parser.add_argument('--use_smiles', action='store_true', default=False)
-        parser.add_argument('--root', type=str, default='data/PubChemDataset_v4')
+        parser.add_argument('--root', type=str, default='./data')
         parser.add_argument('--text_max_len', type=int, default=128)
         parser.add_argument('--prompt', type=str, default='The SMILES of this molecule is [START_I_SMILES]{}[END_I_SMILES]. ')
         parser.add_argument('--filtered_cid_path', type=str, default=None)

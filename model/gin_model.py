@@ -58,7 +58,7 @@ class GNN(torch.nn.Module):
         ###List of batchnorms
         self.batch_norms = torch.nn.ModuleList()
         for layer in range(num_layer):
-            self.batch_norms.append(torch.nn.BatchNorm1d(emb_dim))
+            self.batch_norms.append(torch.nn.BatchNorm1d(emb_dim, dtype = torch.float16))
         self.num_features = emb_dim
         self.cat_grep = True
 
@@ -169,6 +169,7 @@ class HeteGNN(torch.nn.Module):
         self.batch_norms = torch.nn.ModuleList()
         for layer in range(num_layer):
             self.batch_norms.append(torch.nn.BatchNorm1d(emb_dim))
+            
         self.num_features = emb_dim
         self.cat_grep = True
 
@@ -187,7 +188,8 @@ class HeteGNN(torch.nn.Module):
         h_list = [x_dict['node']]
         for layer in range(self.num_layer):
             h = self.gnns[layer](x_dict, edge_index_dict)
-            h = self.batch_norms[layer](h['node'])
+            # h = self.batch_norms[layer](h['node'])
+            h = h['node']
             #h = F.dropout(F.relu(h), self.drop_ratio, training = self.training)
             if layer == self.num_layer - 1:
                 #remove relu for the last layer

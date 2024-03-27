@@ -275,7 +275,7 @@ class Blip2Stage2(pl.LightningModule):
             batch_size = molecule_batch[-1].size(0)
             ###============== molecule Loss ===================###
             molecule_loss = self.blip2opt(molecule_batch)['loss']
-            self.log("molecule loss", float(molecule_loss), batch_size=batch_size, sync_dist=True)
+            self.log("stage1 loss", float(molecule_loss), batch_size=batch_size, sync_dist=True)
             
             ###============== reaction Loss ===================###
             reaction_loss = self.blip2opt.forward_reaction(reaction_batch)['loss']
@@ -287,7 +287,7 @@ class Blip2Stage2(pl.LightningModule):
             batch_size = batch[-1].input_ids.size(0)
             ###============== Overall Loss ===================###
             loss = self.blip2opt(batch)
-            self.log("molecule loss", float(loss['loss']), batch_size=batch_size, sync_dist=True)
+            self.log("total loss", float(loss['loss']), batch_size=batch_size, sync_dist=True)
             self.log("lr", self.trainer.optimizers[0].param_groups[0]['lr'], batch_size=batch_size, sync_dist=True)
             return loss['loss']
 

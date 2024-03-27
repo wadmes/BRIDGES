@@ -1,3 +1,5 @@
+N2V-data
+*.zip
 # Byte-compiled / optimized / DLL files
 *.pt
 __pycache__/
