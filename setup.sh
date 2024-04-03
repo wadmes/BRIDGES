@@ -10,6 +10,6 @@ srun --pty --gres gpu:7g.80gb:1 /bin/bash
 
 python stage2.py --devices '1' --filename "stage2" --stage1_path "all_checkpoints/stage1/epoch=499.ckpt" --opt_model 'facebook/galactica-1.3b' --max_epochs 500 --mode pretrain --tune_gnn --llm_tune freeze --inference_batch_size 4
 
-python app.py --devices 0 --init_checkpoint "all_checkpoints/stage2/epoch=469.ckpt"
+python app.py --devices 0 --init_checkpoint "all_checkpoints/stage2/last-v2.ckpt"
 
 The logic netlist graph tokens are {}. Please describe the logic netlist graph.

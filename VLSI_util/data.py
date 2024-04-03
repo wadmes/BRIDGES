@@ -69,8 +69,8 @@ def cg2homodata(circuit_graph):
         edge_dict[0].append(G.nodes[edge[0]]['index'])
         edge_dict[1].append(G.nodes[edge[1]]['index'])
     data = Data()
-    data.edge_index = torch.tensor(edge_dict)
-    data.x = torch.tensor(node_attribute).long()
+    data.edge_index = torch.tensor(edge_dict) # (E, 2)
+    data.x = torch.tensor(node_attribute).long() # (N, k), k is the dimension of the node features
     data = T.ToUndirected()(data)
     return data
 
