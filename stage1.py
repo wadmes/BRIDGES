@@ -8,7 +8,6 @@ import pytorch_lightning.callbacks as plc
 from pytorch_lightning.loggers import CSVLogger
 from model.blip2_stage1 import Blip2Stage1
 from VLSI_util.data_module import Stage1DM
-from VLSI_util.data import netlistDataset
 
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
 ## for pyg bug

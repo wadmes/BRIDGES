@@ -5,7 +5,7 @@ N2V-data
 __pycache__/
 *.py[cod]
 *$py.class
-
+*.v
 # C extensions
 *.so
 
