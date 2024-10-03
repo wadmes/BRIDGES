@@ -77,6 +77,12 @@ class N2VDataset(InMemoryDataset):
                         raise NotImplementedError
                     self.graphs[-1].rtl = rtl 
                     self.graphs[-1].desc = desc
+                    # read os.path.join(path,directory,'syn',sub_directory,'cmd.tcl'), and save as tcl
+                    try:
+                        with open( os.path.join(path,directory,'syn',sub_directory,'cmd.tcl')) as f:
+                            self.graphs[-1].tcl = f.read()
+                    except FileNotFoundError:
+                        self.graphs[-1].tcl = None
                     netlist_num += 1
                 success_verilog += 1
             except FileNotFoundError:
@@ -101,9 +107,9 @@ The main function is to generate train dataset, eval, and test dataset.
 """
 if __name__ == '__main__':
     bbs =[]
-    hete = N2VDataset('../N2V-data', "hetedata", 'rtl')
+    hete = N2VDataset('/storage/rpurdy/llm/resyn27k/bms', "hetedata", 'rtl')
     # save small to ../netlist_data/arith/small.pt
     torch.save(hete, '../N2V-data/hete_small.pt')
-    homo = N2VDataset('../N2V-data', "homodata", 'rtl')
+    homo = N2VDataset('/storage/rpurdy/llm/resyn27k/bms', "homodata", 'rtl')
     # save small to ../netlist_data/arith/small.pt
     torch.save(homo, '../netlist_data/arith/homo_small.pt')
