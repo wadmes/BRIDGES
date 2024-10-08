@@ -56,8 +56,8 @@ class Stage1DM(LightningDataModule):
     def add_model_specific_args(parent_parser):
         parser = parent_parser.add_argument_group("Data module")
         parser.add_argument('--num_workers', type=int, default=4)
-        parser.add_argument('--batch_size', type=int, default=64)
-        parser.add_argument('--match_batch_size', type=int, default=64)
+        parser.add_argument('--batch_size', type=int, default=4)
+        parser.add_argument('--match_batch_size', type=int, default=4)
         parser.add_argument('--root', type=str, default='./netlist_data/')
         parser.add_argument('--text_max_len', type=int, default=128)
         return parent_parser

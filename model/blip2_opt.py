@@ -210,13 +210,13 @@ class Blip2OPT(Blip2Base):
         graph_embeds, graph_masks = self.graph_encoder(graphs)
         if not self.tune_gnn:
             graph_embeds = graph_embeds.detach()
-        graph_embeds = self.ln_graph(graph_embeds, graph_masks)
+        graph_embeds = self.ln_graph(graph_embeds)
         device = graph_embeds.device
         query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
         query_output = self.Qformer.bert(
             query_embeds=query_tokens,
             encoder_hidden_states=graph_embeds,
-            encoder_attention_mask=graph_masks, # fixme: check whether this mask is correct
+             # fixme: check whether this mask is correct
             return_dict=True,
         )
         mol_tokens = self.opt_proj(query_output.last_hidden_state)
@@ -247,13 +247,13 @@ class Blip2OPT(Blip2Base):
         graph_embeds, graph_masks = self.graph_encoder(graphs)
         if not self.tune_gnn:
             graph_embeds = graph_embeds.detach()
-        graph_embeds = self.ln_graph(graph_embeds, graph_masks)
+        graph_embeds = self.ln_graph(graph_embeds)
         device = graph_embeds.device
         query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
         query_output = self.Qformer.bert(
             query_embeds=query_tokens,
             encoder_hidden_states=graph_embeds,
-            encoder_attention_mask=graph_masks, # fixme: check whether this mask is correct
+             # fixme: check whether this mask is correct
             return_dict=True,
         )
         mol_tokens = self.opt_proj(query_output.last_hidden_state) # shape = [mol_num, num_query_token, D]
@@ -328,7 +328,7 @@ class Blip2OPT(Blip2Base):
         query_output = self.Qformer.bert(
             query_embeds=query_tokens,
             encoder_hidden_states=graph_embeds,
-            encoder_attention_mask=graph_masks,
+            
             return_dict=True,
         )
         mol_tokens = self.opt_proj(query_output.last_hidden_state)
@@ -400,12 +400,12 @@ class Blip2OPT(Blip2Base):
             is_mol_token = (prompt_tokens.input_ids == self.mol_token) # shape = [B, max_len]
             ## graph forward
             graph_embeds, graph_masks = self.graph_encoder(graphs)
-            graph_embeds = self.ln_graph(graph_embeds, graph_masks)
+            graph_embeds = self.ln_graph(graph_embeds)
             query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
             query_output = self.Qformer.bert(
                 query_embeds=query_tokens,
                 encoder_hidden_states=graph_embeds,
-                encoder_attention_mask=graph_masks, # fixme: check whether this mask is correct
+                 # fixme: check whether this mask is correct
                 return_dict=True,
             )
             mol_tokens = self.opt_proj(query_output.last_hidden_state) # shape = [mol_num, num_query_token, D]
@@ -548,12 +548,12 @@ class Blip2OPT(Blip2Base):
             graphs = graphs.to(device)
             ## graph forward
             graph_embeds, graph_masks = self.graph_encoder(graphs)
-            graph_embeds = self.ln_graph(graph_embeds, graph_masks)
+            graph_embeds = self.ln_graph(graph_embeds)
             query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
             query_output = self.Qformer.bert(
                 query_embeds=query_tokens,
                 encoder_hidden_states=graph_embeds,
-                encoder_attention_mask=graph_masks, # fixme: check whether this mask is correct
+                 # fixme: check whether this mask is correct
                 return_dict=True,
             )
             mol_tokens = self.opt_proj(query_output.last_hidden_state) # shape = [mol_num, num_query_token, D]

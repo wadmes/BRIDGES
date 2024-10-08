@@ -16,6 +16,7 @@ addable_types = [
     "nand",
     "nor",
     "xnor",
+    "fflop",
     "0",
     "1",
     "x",
@@ -54,6 +55,36 @@ def cg2hetedata(circuit_graph):
     data['node','inv','node'].edge_index = torch.tensor(edge_dict['inv'])
     return data
 
+
+"""
+Convert a circuitgraph to a hetedata object in pytorch geometric.
+"""
+def networkx2hetedata(G):
+    # node attribute [#_nodes,#_gate_types]
+    node_attribute = []
+    node_index = 0
+    edge_dict = {'pos':[[],[]],'inv':[[],[]]}
+    # key mask, is 1 if the node is a key gate
+    key_mask = []
+    # store key value, for non-key node, the value is set as 0
+    key_values  = []
+    for node in G.nodes():
+        node_type = supported_types.index(G.nodes[node]['type'])
+        node_attribute.append(node_type)
+        G.nodes[node]['index'] = len(node_attribute) - 1
+
+    for edge in G.edges():
+        edge_dict['pos'][0].append(G.nodes[edge[0]]['index'])
+        edge_dict['pos'][1].append(G.nodes[edge[1]]['index'])
+        edge_dict['inv'][0].append(G.nodes[edge[1]]['index'])
+        edge_dict['inv'][1].append(G.nodes[edge[0]]['index'])
+    data = HeteroData()
+    data['node'].x = torch.tensor(node_attribute).long()
+    data['node','pos','node'].edge_index = torch.tensor(edge_dict['pos']).long()
+    data['node','inv','node'].edge_index = torch.tensor(edge_dict['inv']).long()
+    return data
+
+
 def cg2homodata(circuit_graph):
     G = circuit_graph.graph
     # node attribute [#_nodes,#_gate_types]
@@ -75,37 +106,46 @@ def cg2homodata(circuit_graph):
     return data
 
 
+import json
+import pickle
+import tqdm
 class netlistDataset(InMemoryDataset):
     """
-    path: the path to the netlist file, which should only include .v logic netlist files
+    path: the path to the netlist json file.
+    rtl_path: the path to the rtl json file.
     type: graph type for the netlist, could be 'hetedata' or 'homodata'
     """
-    def __init__(self, path, type):
+    def __init__(self, path, rtl_path, type):
         super(netlistDataset,self).__init__()
         print('Loading netlist dataset, path: {}, type: {}'.format(path,type))
+        netlist_file = json.load(open(path))
+        netlist_file_dir_path = os.path.dirname(path)
+        rtl_file = json.load(open(rtl_path))
+
+
         # for each .v file in path
         self.graphs = []
         self.type = type
         bbs = []
-        for file in os.listdir(path):
-            if file.endswith('.v'):
-                # file is {module type}_{bit number}_bit.v
-                module_type = file.split('_')[0]
-                bit_number = file.split('_')[1]
-                
-                circuit = cg.from_file(os.path.join(path,file),blackboxes=bbs)
-                if type == 'hetedata':
-                    self.graphs.append(cg2hetedata(circuit))
-                elif type == 'homodata':
-                    self.graphs.append(cg2homodata(circuit))
-                else:
-                    raise NotImplementedError
-                description = "{}-bit {}".format(bit_number,module_type)
-                self.graphs[-1].text = description
+        for key in tqdm.tqdm(netlist_file.keys()):
+            graph_path = os.path.join(netlist_file_dir_path,'graph', str(netlist_file[key]['rtl_id'])+'_'+netlist_file[key]['synthesis_efforts']+'.pkl')
+            # verilog_path = os.path.join(netlist_file_dir_path,'netlist', str(netlist_file[key]['rtl_id'])+'_'+netlist_file[key]['synthesis_efforts']+'.v')
+            func_desc = rtl_file[str(netlist_file[key]['rtl_id'])]['rtl_description']
+            # circuit = cg.from_file(os.path.join(path,verilog_path),blackboxes=bbs)
+            networkx_graph = pickle.load(open(graph_path,'rb'))
+            if type == 'hetedata':
+                self.graphs.append(networkx2hetedata(networkx_graph))
+            # elif type == 'homodata':
+            #     self.graphs.append(cg2homodata(circuit))
+            else:
+                raise NotImplementedError
+            self.graphs[-1].text = func_desc
     def len(self):
         return len(self.graphs)
 
     def __getitem__(self, index):
+        self.graphs[index]['node','pos','node'].edge_index = self.graphs[index]['node','pos','node'].edge_index.long()
+        self.graphs[index]['node','inv','node'].edge_index = self.graphs[index]['node','inv','node'].edge_index.long()
         return self.graphs[index], self.graphs[index].text
     
 
@@ -118,13 +158,6 @@ The main function is to generate train dataset, eval, and test dataset.
 """
 if __name__ == '__main__':
     bbs =[]
-    small = netlistDataset('../netlist_data/arith', "hetedata")
-    # repeat small for 50 times
-    print(small[0])
-    # save small to ../netlist_data/arith/small.pt
-    torch.save(small, '../netlist_data/arith/hete_small.pt')
-    small = netlistDataset('../netlist_data/arith', "homodata")
-    # repeat small for 50 times
-    print(small[0])
-    # save small to ../netlist_data/arith/small.pt
-    torch.save(small, '../netlist_data/arith/homo_small.pt')
+    test = netlistDataset('/home/weili3/VLSI-LLM/data_collection/netlist_data/netlist.json',"/home/weili3/VLSI-LLM/data_collection/rtl_data/RTL_with_desc.json", "hetedata")
+    # save test to './netlist.pt'
+    torch.save(test, './netlist.pt')

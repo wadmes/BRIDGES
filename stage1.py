@@ -4,10 +4,11 @@ import torch
 import warnings
 import pytorch_lightning as pl
 from pytorch_lightning import Trainer, strategies
-import pytorch_lightning.callbacks as plc
-from pytorch_lightning.loggers import CSVLogger
+import pytorch_lightning.callbacks as plc 
+from pytorch_lightning.loggers import WandbLogger
 from model.blip2_stage1 import Blip2Stage1
 from VLSI_util.data_module import Stage1DM
+from VLSI_util.data import netlistDataset
 
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
 ## for pyg bug
@@ -42,14 +43,15 @@ def main(args):
                                          save_top_k=-1))
     
     find_unused_parameters = (not args.gtm) or (not args.lm)
-    if len(args.devices.split(',')) > 1:
-        strategy = strategies.DDPStrategy(find_unused_parameters=find_unused_parameters, start_method='spawn')
-    else:
-        strategy = 'auto'
-        args.devices = eval(args.devices)
-    print(f"strategy: {strategy}", ". Devices:", args.devices)
-    logger = CSVLogger(save_dir=f'./all_checkpoints/{args.filename}/')
-    trainer = Trainer(accelerator=args.accelerator, devices=args.devices, precision=args.precision, max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, callbacks=callbacks, strategy=strategy, logger=logger)
+    # if len(args.devices.split(',')) > 1:
+    strategy = strategies.DDPStrategy(find_unused_parameters=find_unused_parameters, start_method='spawn')
+    # else:
+    #     strategy = 'auto'
+    #     args.devices = eval(args.devices)
+    # print(f"strategy: {strategy}", ". Devices:", args.devices)
+    logger = WandbLogger(project='graphLLM')
+    # trainer = Trainer(accelerator=args.accelerator, devices=args.devices, precision=args.precision, max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, callbacks=callbacks, strategy=strategy, logger=logger)
+    trainer = Trainer(precision=args.precision, max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, callbacks=callbacks, logger=logger, profiler="simple", strategy=strategy,devices = 1)
     if args.mode == 'train':
         trainer.fit(model, datamodule=dm)
     elif args.mode == 'eval':
@@ -72,7 +74,7 @@ if __name__ == '__main__':
     parser.add_argument('--accelerator', type=str, default='gpu')
     parser.add_argument('--devices', type=str, default='0,1,2,3')
     parser.add_argument('--precision', type=str, default='bf16-mixed')
-    parser.add_argument('--max_epochs', type=int, default=50)
+    parser.add_argument('--max_epochs', type=int, default=5)
     parser.add_argument('--check_val_every_n_epoch', type=int, default=1)
     # parser.add_argument('--save_every_n_epochs', type=int, default=1)
     # parser = Trainer.add_argparse_args(parser)

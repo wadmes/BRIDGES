@@ -41,7 +41,7 @@ def concat_all_gather(tensor):
     torch.distributed.all_gather(tensors_gather, tensor, async_op=False)
 
     output = torch.cat(tensors_gather, dim=0)
-    print('running here')
+    # print('running here')
     return output
 
 # @torch.no_grad()
@@ -230,6 +230,7 @@ class Blip2Qformer(Blip2Base):
         features_text_all: shape = [B * num_gpus, D]
         features_graph_all: shape = [B * num_gpus, num_qs, D]
         '''
+        # print("features_graph.shape, features_text.shape", features_graph.shape, features_text.shape)
         bs = features_graph.size(0)
 
         # cosine similarity as logits
@@ -250,6 +251,7 @@ class Blip2Qformer(Blip2Base):
         else:
             labels = torch.arange(bs, dtype=torch.long, device=self.device)
 
+        # print("logits_per_graph.shape, labels.shape", logits_per_graph.shape, labels.shape)
         loss_graph = F.cross_entropy(logits_per_graph, labels)
         loss_text = F.cross_entropy(logits_per_text, labels)
         loss = (loss_graph + loss_text) / 2
@@ -272,12 +274,11 @@ class Blip2Qformer(Blip2Base):
             batch_node = batch_node.detach()
         batch_size = batch_node.shape[0]
 
-        batch_node = self.ln_graph(batch_node, batch_mask)
+        batch_node = self.ln_graph(batch_node)  # TODO: ln: layer normalization does not use batch_mask here
         query_tokens = self.query_tokens.expand(batch_node.shape[0], -1, -1)
         query_output = self.Qformer.bert(
             query_embeds=query_tokens,
             encoder_hidden_states=batch_node,
-            encoder_attention_mask=batch_mask, # fixme: check whether this mask is correct
             use_cache=True,
             return_dict=True,
         )
@@ -391,12 +392,11 @@ class Blip2Qformer(Blip2Base):
 
     def graph_forward(self, graph):
         batch_node, batch_mask = self.graph_encoder(graph) # batch_mask shape = [B, N], N is the maximum number of nodes in the batch
-        batch_node = self.ln_graph(batch_node, batch_mask)
+        batch_node = self.ln_graph(batch_node)
         query_tokens = self.query_tokens.expand(batch_node.shape[0], -1, -1)
         query_output = self.Qformer.bert(
             query_embeds=query_tokens,
             encoder_hidden_states=batch_node,
-            encoder_attention_mask=batch_mask, # fixme: check whether this mask is correct
             use_cache=False,
             return_dict=True,
         )

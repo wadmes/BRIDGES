@@ -59,51 +59,51 @@ class Blip2Stage1(pl.LightningModule):
             g2t_rerank_acc, t2g_rerank_acc, g2t_rerank_rec20, t2g_rerank_rec20,\
             graph_rep_total, text_rep_total, _, _, _, _ = \
                 eval_retrieval_inbatch_with_rerank(self.blip2qformer, self.val_match_loader, self.device)
-            self.log("val_inbatch_g2t_acc", g2t_acc, sync_dist=False)
-            self.log("val_inbatch_t2g_acc", t2g_acc, sync_dist=False)
-            self.log("val_inbatch_g2t_rec20", g2t_rec20, sync_dist=False)
-            self.log("val_inbatch_t2g_rec20", t2g_rec20, sync_dist=False)
+            self.log("val_inbatch_g2t_acc", g2t_acc, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("val_inbatch_t2g_acc", t2g_acc, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("val_inbatch_g2t_rec20", g2t_rec20, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("val_inbatch_t2g_rec20", t2g_rec20, sync_dist=False, batch_size = self.args.batch_size)
 
-            self.log("rerank_val_inbatch_g2t_acc", g2t_rerank_acc, sync_dist=False)
-            self.log("rerank_val_inbatch_t2g_acc", t2g_rerank_acc, sync_dist=False)
-            self.log("rerank_val_inbatch_g2t_rec20", g2t_rerank_rec20, sync_dist=False)
-            self.log("rerank_val_inbatch_t2g_rec20", t2g_rerank_rec20, sync_dist=False)
+            self.log("rerank_val_inbatch_g2t_acc", g2t_rerank_acc, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("rerank_val_inbatch_t2g_acc", t2g_rerank_acc, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("rerank_val_inbatch_g2t_rec20", g2t_rerank_rec20, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("rerank_val_inbatch_t2g_rec20", t2g_rerank_rec20, sync_dist=False, batch_size = self.args.batch_size)
             
             g2t_acc, g2t_rec20, t2g_acc, t2g_rec20, _ = \
                 eval_retrieval_fullset(graph_rep_total, text_rep_total, self.device)
-            self.log("val_fullset_g2t_acc", g2t_acc, sync_dist=False)
-            self.log("val_fullset_t2g_acc", t2g_acc, sync_dist=False)
-            self.log("val_fullset_g2t_rec20", g2t_rec20, sync_dist=False)
-            self.log("val_fullset_t2g_rec20", t2g_rec20, sync_dist=False)
+            self.log("val_fullset_g2t_acc", g2t_acc, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("val_fullset_t2g_acc", t2g_acc, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("val_fullset_g2t_rec20", g2t_rec20, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("val_fullset_t2g_rec20", t2g_rec20, sync_dist=False, batch_size = self.args.batch_size)
 
             ## for test set
             g2t_acc, t2g_acc, g2t_rec20, t2g_rec20, \
             g2t_rerank_acc, t2g_rerank_acc, g2t_rerank_rec20, t2g_rerank_rec20, \
             graph_rep_total, text_rep_total, graph_feat_total, graph_mask_total, text_total, text_mask_total = \
                 eval_retrieval_inbatch_with_rerank(self.blip2qformer, self.test_match_loader, self.device)
-            self.log("rerank_test_inbatch_g2t_acc", g2t_rerank_acc, sync_dist=False)
-            self.log("rerank_test_inbatch_t2g_acc", t2g_rerank_acc, sync_dist=False)
-            self.log("rerank_test_inbatch_g2t_rec20", g2t_rerank_rec20, sync_dist=False)
-            self.log("rerank_test_inbatch_t2g_rec20", t2g_rerank_rec20, sync_dist=False)
+            self.log("rerank_test_inbatch_g2t_acc", g2t_rerank_acc, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("rerank_test_inbatch_t2g_acc", t2g_rerank_acc, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("rerank_test_inbatch_g2t_rec20", g2t_rerank_rec20, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("rerank_test_inbatch_t2g_rec20", t2g_rerank_rec20, sync_dist=False, batch_size = self.args.batch_size)
 
-            self.log("test_inbatch_g2t_acc", g2t_acc, sync_dist=False)
-            self.log("test_inbatch_t2g_acc", t2g_acc, sync_dist=False)
-            self.log("test_inbatch_g2t_rec20", g2t_rec20, sync_dist=False)
-            self.log("test_inbatch_t2g_rec20", t2g_rec20, sync_dist=False)
+            self.log("test_inbatch_g2t_acc", g2t_acc, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("test_inbatch_t2g_acc", t2g_acc, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("test_inbatch_g2t_rec20", g2t_rec20, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("test_inbatch_t2g_rec20", t2g_rec20, sync_dist=False, batch_size = self.args.batch_size)
             
             g2t_acc, g2t_rec20, t2g_acc, t2g_rec20, sim_g2t = \
                 eval_retrieval_fullset(graph_rep_total, text_rep_total, self.device)
-            self.log("test_fullset_g2t_acc", g2t_acc, sync_dist=False)
-            self.log("test_fullset_t2g_acc", t2g_acc, sync_dist=False)
-            self.log("test_fullset_g2t_rec20", g2t_rec20, sync_dist=False)
-            self.log("test_fullset_t2g_rec20", t2g_rec20, sync_dist=False)
+            self.log("test_fullset_g2t_acc", g2t_acc, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("test_fullset_t2g_acc", t2g_acc, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("test_fullset_g2t_rec20", g2t_rec20, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("test_fullset_t2g_rec20", t2g_rec20, sync_dist=False, batch_size = self.args.batch_size)
 
             g2t_acc, g2t_rec20, t2g_acc, t2g_rec20 = \
                 eval_retrieval_fullset_for_rerank(self.blip2qformer, sim_g2t, graph_feat_total, graph_mask_total, text_total, text_mask_total, self.rerank_cand_num, self.device)
-            self.log("rerank_test_fullset_g2t_acc", g2t_acc, sync_dist=False)
-            self.log("rerank_test_fullset_t2g_acc", t2g_acc, sync_dist=False)
-            self.log("rerank_test_fullset_g2t_rec20", g2t_rec20, sync_dist=False)
-            self.log("rerank_test_fullset_t2g_rec20", t2g_rec20, sync_dist=False)
+            self.log("rerank_test_fullset_g2t_acc", g2t_acc, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("rerank_test_fullset_t2g_acc", t2g_acc, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("rerank_test_fullset_g2t_rec20", g2t_rec20, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("rerank_test_fullset_t2g_rec20", t2g_rec20, sync_dist=False, batch_size = self.args.batch_size)
             del graph_rep_total, text_rep_total
 
     def training_step(self, batch, batch_idx):
@@ -119,6 +119,9 @@ class Blip2Stage1(pl.LightningModule):
         self.log("train_loss_lm", float(blip2_loss.loss_lm), batch_size=batch_size, sync_dist=True)
         self.log("train_loss", float(blip2_loss.loss), batch_size=batch_size, sync_dist=True)
         self.log("lr", self.trainer.optimizers[0].param_groups[0]['lr'], batch_size=batch_size, sync_dist=True)
+        # print(torch.cuda.memory_reserved() / 1024 ** 3, "GB")
+        # empty cache
+        torch.cuda.empty_cache()
         return blip2_loss.loss
 
     @staticmethod
@@ -127,12 +130,12 @@ class Blip2Stage1(pl.LightningModule):
         # train mode
         parser.add_argument('--temperature', type=float, default=0.1, help='the temperature of NT_XentLoss')
 
-        parser.add_argument('--save_every_n_epochs', type=int, default=10)
+        parser.add_argument('--save_every_n_epochs', type=int, default=1)
         # evaluation
-        parser.add_argument('--rerank_cand_num', type=int, default=128)
+        parser.add_argument('--rerank_cand_num', type=int, default=8)
         
         # GIN
-        parser.add_argument('--gin_hidden_dim', type=int, default=300)
+        parser.add_argument('--gin_hidden_dim', type=int, default=512)
         parser.add_argument('--gin_num_layers', type=int, default=5)
         parser.add_argument('--drop_ratio', type=float, default=0.0)
         parser.add_argument('--tune_gnn', action='store_true', default=False)

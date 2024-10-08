@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch_geometric.nn.inits import glorot, zeros
 from torch_geometric.nn import HGTConv, SAGEConv, GINConv,GraphConv,GATv2Conv,GATConv, GCNConv, HeteroConv
 from torch.nn import Linear, Sequential, ReLU
-
+from torch_geometric.nn.aggr import MultiAggregation
 
 input_dim = 17 # totally 17 types of nodes
 """
@@ -125,7 +125,7 @@ class HeteGNN(torch.nn.Module):
         node representations
 
     """
-    def __init__(self, num_layer, emb_dim, JK = "last", drop_ratio = 0, gnn_type = "gin"):
+    def __init__(self, num_layer, emb_dim, JK = "last", drop_ratio = 0, gnn_type = "gin",final_aggr = 'multi-aggregate'):
         super(HeteGNN, self).__init__()
         self.num_layer = num_layer
         self.drop_ratio = drop_ratio
@@ -171,7 +171,9 @@ class HeteGNN(torch.nn.Module):
             self.batch_norms.append(torch.nn.BatchNorm1d(emb_dim))
             
         self.num_features = emb_dim
-        self.cat_grep = True
+        self.cat_grep = True # cat the graph representation
+        # self.aggregator = MultiAggregation(['sum', 'mean', 'max','min','softmax','median','std','var'])
+        self.aggregator = MultiAggregation(['sum', 'mean', 'max','min'])
 
     #def forward(self, x, edge_index, edge_attr):
     def forward(self, *argv):
@@ -211,17 +213,24 @@ class HeteGNN(torch.nn.Module):
             h_list = [h.unsqueeze_(0) for h in h_list]
             node_representation = torch.sum(torch.cat(h_list, dim=0), dim=0)[0]
         
+        # print(node_representation.shape)  # shape = [B,N, D] B = batch size, N = # of nodes (1 million), D = embedding dim (512)
+        h_graph = self.aggregator(node_representation, batch) # shape = [B,  D * 4], multi-aggregate all nodes using 8 different methods
+        h_graph = h_graph.view(h_graph.size(0), -1, 4) # shape = [B, D, 4]
+        # swap the last two dimensions
+        h_graph = h_graph.permute(0, 2, 1) # shape = [B, 4, D]
+        batch_mask = torch.ones((h_graph.shape[0],h_graph.shape[1]), dtype=torch.bool, device=batch.device)
+        return h_graph, batch_mask
+        exit()
+        # h_graph = self.pool(node_representation, batch) # shape = [B, D]
+        # batch_node, batch_mask = to_dense_batch(node_representation, batch) # shape = [B, n_max, D], 
+        # batch_mask = batch_mask.bool()
 
-        h_graph = self.pool(node_representation, batch) # shape = [B, D]
-        batch_node, batch_mask = to_dense_batch(node_representation, batch) # shape = [B, n_max, D], 
-        batch_mask = batch_mask.bool()
-
-        if self.cat_grep:
-            batch_node = torch.cat((h_graph.unsqueeze(1), batch_node), dim=1) # shape = [B, n_max+1, D]
-            batch_mask = torch.cat([torch.ones((batch_mask.shape[0], 1), dtype=torch.bool, device=batch.device), batch_mask], dim=1)
-            return batch_node, batch_mask
-        else:
-            return batch_node, batch_mask, h_graph
+        # if self.cat_grep:
+        #     batch_node = torch.cat((h_graph.unsqueeze(1), batch_node), dim=1) # shape = [B, n_max+1, D]
+        #     batch_mask = torch.cat([torch.ones((batch_mask.shape[0], 1), dtype=torch.bool, device=batch.device), batch_mask], dim=1)
+        #     return batch_node, batch_mask
+        # else:
+        #     return batch_node, batch_mask, h_graph
 
 
 
