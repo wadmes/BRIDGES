@@ -38,6 +38,7 @@ class Blip2Stage1(pl.LightningModule):
 
     @torch.no_grad()
     def validation_step(self, batch, batch_idx):
+        return 0
         if isinstance(self.args.devices, list) and len(self.args.devices) == 1 and self.args.mode == "eval":
             return 0
         batch_size = batch[-1].size(0)
@@ -50,6 +51,7 @@ class Blip2Stage1(pl.LightningModule):
         return blip2_loss.loss
     
     def on_validation_epoch_end(self) -> None:
+        return 0
         if self.current_epoch == 0 or (self.current_epoch + 1) % self.args.retrieval_eval_epoch != 0:
             return
         if self.trainer.global_rank == 0:
