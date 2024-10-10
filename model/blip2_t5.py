@@ -73,7 +73,7 @@ class Blip2T5(Blip2Base):
         self.opt_tokenizer = T5TokenizerFast.from_pretrained(opt_model)
         self.opt_tokenizer.add_tokens('<graph>') # molecule placeholder
         self.mol_token = '<graph>'
-        self.opt_tokenizer.mol_token_id = self.opt_tokenizer("<graph>", add_special_tokens=False).input_ids[0]
+        self.opt_tokenizer.graph_token_id = self.opt_tokenizer("<graph>", add_special_tokens=False).input_ids[0]
         
         self.opt_model = T5ForConditionalGeneration.from_pretrained('laituan245/molt5-large', torch_dtype=torch.float32)
         self.opt_model.resize_token_embeddings(len(self.opt_tokenizer)) ## this will cause bug when full fine-tuning the opt model
@@ -132,7 +132,7 @@ class Blip2T5(Blip2Base):
         )
         with self.maybe_autocast(torch.float32):
             prompt_embeds = self.opt_model.encoder.embed_tokens(prompt_tokens.input_ids)
-            prompt_embeds[prompt_tokens.is_mol_token] = mol_tokens.flatten(0, 1).to(torch.float32)
+            prompt_embeds[prompt_tokens.is_graph_token] = mol_tokens.flatten(0, 1).to(torch.float32)
             outputs = self.opt_model(
                 inputs_embeds=prompt_embeds,
                 attention_mask=prompt_tokens.attention_mask,
@@ -186,9 +186,9 @@ class Blip2T5(Blip2Base):
         mol_tokens = self.opt_proj(query_output.last_hidden_state)
         with self.maybe_autocast(torch.float32):
             prompt_embeds = self.opt_model.encoder.embed_tokens(prompt_tokens.input_ids)
-            prompt_embeds[prompt_tokens.is_mol_token] = mol_tokens.flatten(0, 1).to(torch.float32)
+            prompt_embeds[prompt_tokens.is_graph_token] = mol_tokens.flatten(0, 1).to(torch.float32)
             # prompt_embeds = self.opt_model.encoder.embed_tokens(prompt_tokens.input_ids)
-            # prompt_embeds[prompt_tokens.is_mol_token] = mol_tokens.flatten(0, 1)
+            # prompt_embeds[prompt_tokens.is_graph_token] = mol_tokens.flatten(0, 1)
 
             outputs = self.opt_model.generate(
                 inputs_embeds=prompt_embeds,

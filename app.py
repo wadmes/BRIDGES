@@ -30,8 +30,8 @@ def netlist_caption(netlist_path, prompt, temperature):
                                        add_special_tokens=True,
                                        return_tensors='pt',
                                        return_attention_mask=True).to(args.devices)
-    is_mol_token = prompt_batch.input_ids == molca.opt_tokenizer.mol_token_id
-    prompt_batch['is_mol_token'] = is_mol_token
+    is_graph_token = prompt_batch.input_ids == molca.opt_tokenizer.graph_token_id
+    prompt_batch['is_graph_token'] = is_graph_token
     
     samples = {'graphs': graph_batch, 'prompt_tokens': prompt_batch}
     

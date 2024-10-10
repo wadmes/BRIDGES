@@ -152,9 +152,11 @@ class Blip2OPT(Blip2Base):
         ## initialize opt model
         self.opt_tokenizer = AutoTokenizer.from_pretrained(opt_model, use_fast=False, padding_side='right')
         self.opt_tokenizer.add_special_tokens({'pad_token': '<pad>'})
-        self.opt_tokenizer.add_tokens('<graph>') # molecule placeholder
+        self.opt_tokenizer.add_tokens('<graph>') # graph placeholder
+        self.opt_tokenizer.add_tokens('[START_NETLIST_GRAPH]') 
+        self.opt_tokenizer.add_tokens('[END_NETLIST_GRAPH]')
         self.mol_token = '<graph>'
-        self.opt_tokenizer.mol_token_id = self.opt_tokenizer("<graph>", add_special_tokens=False).input_ids[0]
+        self.opt_tokenizer.graph_token_id = self.opt_tokenizer("<graph>", add_special_tokens=False).input_ids[0]
 
         self.collater = Collater([], [])
         
@@ -228,7 +230,7 @@ class Blip2OPT(Blip2Base):
         targets = torch.cat([empty_targets, targets], dim=1)
 
         prompt_embeds = self.opt_model.get_input_embeddings()(prompt_tokens.input_ids)
-        prompt_embeds[prompt_tokens.is_mol_token] = mol_tokens.flatten(0, 1) # change mol placeholder to the actual mol tokens from graph
+        prompt_embeds[prompt_tokens.is_graph_token] = mol_tokens.flatten(0, 1) # change mol placeholder to the actual mol tokens from graph
         inputs_embeds = self.opt_model.get_input_embeddings()(text_tokens.input_ids)
         inputs_embeds = torch.cat((prompt_embeds, inputs_embeds), dim=1)
         attention_mask = torch.cat([prompt_tokens.attention_mask, text_tokens.attention_mask], dim=1)
@@ -334,7 +336,7 @@ class Blip2OPT(Blip2Base):
         mol_tokens = self.opt_proj(query_output.last_hidden_state)
         
         prompt_embeds = self.opt_model.get_input_embeddings()(prompt_tokens.input_ids)
-        prompt_embeds[prompt_tokens.is_mol_token] = mol_tokens.flatten(0, 1)
+        prompt_embeds[prompt_tokens.is_graph_token] = mol_tokens.flatten(0, 1)
 
         outputs = self.opt_model.generate(
             inputs_embeds=prompt_embeds,
@@ -397,7 +399,7 @@ class Blip2OPT(Blip2Base):
         
         if len(mol_list) > 0:
             graphs = self.collater(mol_list).to(device)
-            is_mol_token = (prompt_tokens.input_ids == self.mol_token) # shape = [B, max_len]
+            is_graph_token = (prompt_tokens.input_ids == self.mol_token) # shape = [B, max_len]
             ## graph forward
             graph_embeds, graph_masks = self.graph_encoder(graphs)
             graph_embeds = self.ln_graph(graph_embeds)
@@ -410,7 +412,7 @@ class Blip2OPT(Blip2Base):
             )
             mol_tokens = self.opt_proj(query_output.last_hidden_state) # shape = [mol_num, num_query_token, D]
             ## replace mol tokens
-            prompt_embeds[is_mol_token] = mol_tokens.flatten(0, 1)
+            prompt_embeds[is_graph_token] = mol_tokens.flatten(0, 1)
         
         if output_scores:
             outputs = self.opt_model.generate(

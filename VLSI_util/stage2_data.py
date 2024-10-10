@@ -10,12 +10,12 @@ from torch_geometric.data import Batch
 RDLogger.DisableLog('rdApp.*')
 
 class TrainCollater:
-    def __init__(self, tokenizer, text_max_len, mol_ph, mol_token_id, prompt):
+    def __init__(self, tokenizer, text_max_len, mol_ph, graph_token_id, prompt):
         self.text_max_len = text_max_len
         self.tokenizer = tokenizer
         self.collater = Collater([], [])
         self.mol_ph = mol_ph
-        self.mol_token_id = mol_token_id
+        self.graph_token_id = graph_token_id
         self.prompt = prompt
         
     def __call__(self, batch):
@@ -32,10 +32,10 @@ class TrainCollater:
                                               return_attention_mask=True)
 
         # in smiles_handler, the token graph_ph_token (<graph>) is inserted
-        is_mol_token = prompt_tokens.input_ids == self.mol_token_id # self.opt_tokenizer.mol_token_id = self.opt_tokenizer("<graph>", add_special_tokens=False).input_ids[0]
-        prompt_tokens['is_mol_token'] = is_mol_token 
-        # print(smiles_prompt_tokens.input_ids, self.mol_token_id)
-        # print(is_mol_token)
+        is_graph_token = prompt_tokens.input_ids == self.graph_token_id # self.opt_tokenizer.graph_token_id = self.opt_tokenizer("<graph>", add_special_tokens=False).input_ids[0]
+        prompt_tokens['is_graph_token'] = is_graph_token 
+        # print(smiles_prompt_tokens.input_ids, self.graph_token_id)
+        # print(is_graph_token)
         self.tokenizer.paddding_side = 'right'
         text_tokens = self.tokenizer(text=texts,
                                      truncation=True,
@@ -49,12 +49,12 @@ class TrainCollater:
     
 
 class InferenceCollater:
-    def __init__(self, tokenizer, text_max_len, mol_ph, mol_token_id, prompt):
+    def __init__(self, tokenizer, text_max_len, mol_ph, graph_token_id, prompt):
         self.text_max_len = text_max_len
         self.tokenizer = tokenizer
         self.collater = Collater([], [])
         self.mol_ph = mol_ph
-        self.mol_token_id = mol_token_id
+        self.graph_token_id = graph_token_id
         self.prompt = prompt
     def __call__(self, batch):
         graphs, texts = zip(*batch)
@@ -70,8 +70,8 @@ class InferenceCollater:
                                               return_attention_mask=True)
 
         # in smiles_handler, the token graph_ph_token (<graph>) is inserted
-        is_mol_token = prompt_tokens.input_ids == self.mol_token_id # self.opt_tokenizer.mol_token_id = self.opt_tokenizer("<graph>", add_special_tokens=False).input_ids[0]
-        prompt_tokens['is_mol_token'] = is_mol_token 
+        is_graph_token = prompt_tokens.input_ids == self.graph_token_id # self.opt_tokenizer.graph_token_id = self.opt_tokenizer("<graph>", add_special_tokens=False).input_ids[0]
+        prompt_tokens['is_graph_token'] = is_graph_token 
         return graph_batch, prompt_tokens, texts
     
 
@@ -82,7 +82,7 @@ class Stage2Netlist(LightningDataModule):
         mode: str = 'pretrain',
         num_workers: int = 0,
         batch_size: int = 256,
-        root: str = './data/',
+        root: str = './VLSI_util/',
         text_max_len: int = 128,
         tokenizer=None,
         args=None,
@@ -95,9 +95,10 @@ class Stage2Netlist(LightningDataModule):
         self.num_workers = num_workers
         self.text_max_len = text_max_len
         self.prompt = args.prompt
-        self.train_dataset = torch.load(root + 'arith/hete_small.pt')
-        self.val_dataset = torch.load(root + 'arith/hete_small.pt')
-        self.test_dataset = torch.load(root + 'arith/hete_small.pt')
+        self.data_set = torch.load(root + '/netlist.pt')
+        self.train_dataset = self.data_set
+        self.val_dataset = self.data_set
+        self.test_dataset = self.data_set
         self.init_tokenizer(tokenizer)
         self.graph_ph_token = '<graph>' * self.args.num_query_token # ph is short for placeholder
         
@@ -108,8 +109,8 @@ class Stage2Netlist(LightningDataModule):
         self.train_dataset.tokenizer = tokenizer
         self.val_dataset.tokenizer = tokenizer
         self.test_dataset.tokenizer = tokenizer
-        self.mol_token_id = self.tokenizer.mol_token_id
-        self.tokenizer.mol_token_id = tokenizer("<graph>", add_special_tokens=False).input_ids[0]
+        self.graph_token_id = self.tokenizer.graph_token_id
+        self.tokenizer.graph_token_id = tokenizer("<graph>", add_special_tokens=False).input_ids[0]
 
     def train_dataloader(self):
         loader = DataLoader(
@@ -120,7 +121,7 @@ class Stage2Netlist(LightningDataModule):
             pin_memory=False,
             drop_last=True,
             persistent_workers=True,
-            collate_fn=TrainCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.mol_token_id, self.prompt),
+            collate_fn=TrainCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt),
         )
         return loader
 
@@ -133,7 +134,7 @@ class Stage2Netlist(LightningDataModule):
             pin_memory=False,
             drop_last=False,
             persistent_workers=True,
-            collate_fn=TrainCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.mol_token_id, self.prompt),
+            collate_fn=TrainCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt),
         )
         test_loader = DataLoader(
             self.test_dataset,
@@ -143,7 +144,7 @@ class Stage2Netlist(LightningDataModule):
             pin_memory=False,
             drop_last=False,
             persistent_workers=True,
-            collate_fn=InferenceCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.mol_token_id, self.prompt),
+            collate_fn=InferenceCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt),
         )
         return [val_loader, test_loader]
     
@@ -156,18 +157,18 @@ class Stage2Netlist(LightningDataModule):
             pin_memory=False,
             drop_last=False,
             persistent_workers=True,
-            collate_fn=InferenceCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.mol_token_id, self.prompt),
+            collate_fn=InferenceCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt),
         )
         return loader
 
     def add_model_specific_args(parent_parser):
         parser = parent_parser.add_argument_group("Data module")
         parser.add_argument('--num_workers', type=int, default=2)
-        parser.add_argument('--batch_size', type=int, default=4)
-        parser.add_argument('--inference_batch_size', type=int, default=4)
+        parser.add_argument('--batch_size', type=int, default=8)
+        parser.add_argument('--inference_batch_size', type=int, default=8)
         parser.add_argument('--use_smiles', action='store_true', default=False)
-        parser.add_argument('--root', type=str, default='./netlist_data/')
+        parser.add_argument('--root', type=str, default='/scratch/scratch/weili3')
         parser.add_argument('--text_max_len', type=int, default=128)
-        parser.add_argument('--prompt', type=str, default='{}')
+        parser.add_argument('--prompt', type=str, default='The graph of this module is [START_NETLIST_GRAPH]{}[END__NETLIST_GRAPH].')
         return parent_parser
     

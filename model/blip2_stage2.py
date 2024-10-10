@@ -175,25 +175,6 @@ class Blip2Stage2(pl.LightningModule):
         )
         return predictions, texts
 
-    # @torch.no_grad()
-    # def validation_step(self, batch, batch_idx, dataloader_idx=0):
-    #     if dataloader_idx == 0:
-    #         _, _, prompt_lens = batch
-    #         batch_size = prompt_lens.shape[0]
-    #         loss = self.blip2opt(batch)
-    #         ###============== Overall Loss ===================###
-    #         self.log("val molecule loss", float(loss['loss']), batch_size=batch_size, sync_dist=True)
-    #         return loss['loss']
-    #     elif dataloader_idx == 1:
-    #         reaction_tokens, _, _ = batch
-    #         batch_size = reaction_tokens.input_ids.shape[0]
-    #         loss = self.blip2opt.forward_reaction(batch)
-    #         ###============== Overall Loss ===================###
-    #         self.log("val reaction loss", float(loss['loss']), batch_size=batch_size, sync_dist=True)
-    #         return loss['loss']
-    #     else:
-    #         raise NotImplementedError
-    
     @torch.no_grad()
     def validation_step(self, batch, batch_idx, dataloader_idx):
         if dataloader_idx == 0:
@@ -296,7 +277,7 @@ class Blip2Stage2(pl.LightningModule):
         parser = parent_parser.add_argument_group("GINSimclr")
         # train mode
         # GIN
-        parser.add_argument('--gin_hidden_dim', type=int, default=300)
+        parser.add_argument('--gin_hidden_dim', type=int, default=512)
         parser.add_argument('--gin_num_layers', type=int, default=5)
         parser.add_argument('--drop_ratio', type=float, default=0.0)
         parser.add_argument('--tune_gnn', action='store_true', default=False)
@@ -316,7 +297,7 @@ class Blip2Stage2(pl.LightningModule):
         parser.add_argument('--peft_config', type=str, default=None)
         parser.add_argument('--peft_dir', type=str, default='')
 
-        parser.add_argument('--save_every_n_epochs', type=int, default=10)
+        parser.add_argument('--save_every_n_epochs', type=int, default=1)
         ## quantization
         parser.add_argument('--load_in_8bit', action='store_true', default=False)
 

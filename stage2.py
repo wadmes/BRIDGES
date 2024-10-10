@@ -5,7 +5,7 @@ import warnings
 import pytorch_lightning as pl
 from pytorch_lightning import Trainer, strategies
 import pytorch_lightning.callbacks as plc
-from pytorch_lightning.loggers import CSVLogger
+from pytorch_lightning.loggers import WandbLogger
 from model.blip2_stage2 import Blip2Stage2
 from VLSI_util.stage2_data import Stage2Netlist
 from VLSI_util.data import netlistDataset
@@ -76,14 +76,8 @@ def main(args):
     else:
         strategy = 'auto'
         args.devices = eval(args.devices)
-    logger = CSVLogger(save_dir=f'./all_checkpoints/{args.filename}/')
-    # trainer = Trainer.from_argparse_args(args,
-    #                                      callbacks=callbacks,
-    #                                      strategy=strategy,
-    #                                      logger=logger,
-    #                                     #  limit_train_batches=100,
-    #                                      )
-    trainer = Trainer(accelerator=args.accelerator, devices=args.devices, precision=args.precision, max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, callbacks=callbacks, strategy=strategy, logger=logger)
+    logger = WandbLogger(project='LLM-graph-stage2')
+    trainer = Trainer(accelerator=args.accelerator, devices=args.devices, precision=args.precision, max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, callbacks=callbacks, strategy=strategy, logger=logger,limit_val_batches=0, limit_test_batches=0)
     if args.mode in {'pretrain', 'ft'}:
         trainer.fit(model, datamodule=dm, ckpt_path=args.ckpt_path)
     elif args.mode == 'eval':

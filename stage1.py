@@ -25,7 +25,7 @@ def main(args):
         model = Blip2Stage1.load_from_checkpoint(args.init_checkpoint, device=args.devices, args=args)
         print(f"loading model from {args.init_checkpoint}")
     else:
-        model = Blip2Stage1(args, limit_val_batches=0, limit_test_batches=0)
+        model = Blip2Stage1(args)
     
     print('total params:', sum(p.numel() for p in model.parameters()))
 
@@ -44,7 +44,7 @@ def main(args):
     
     # logger = CSVLogger(save_dir=f'./all_checkpoints/{args.filename}/')
     logger = WandbLogger(project='LLM-graph')
-    trainer = Trainer(precision=args.precision, max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, callbacks=callbacks, logger = logger)
+    trainer = Trainer(precision=args.precision, max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, callbacks=callbacks, logger = logger, limit_val_batches=0, limit_test_batches=0)
     if args.mode == 'train':
         trainer.fit(model, datamodule=dm)
     elif args.mode == 'eval':
@@ -67,7 +67,7 @@ if __name__ == '__main__':
     parser.add_argument('--accelerator', type=str, default='gpu')
     parser.add_argument('--devices', type=str, default='0,1,2,3')
     parser.add_argument('--precision', type=str, default='bf16-mixed')
-    parser.add_argument('--max_epochs', type=int, default=5)
+    parser.add_argument('--max_epochs', type=int, default=10)
     parser.add_argument('--check_val_every_n_epoch', type=int, default=1)
     # parser.add_argument('--save_every_n_epochs', type=int, default=1)
     # parser = Trainer.add_argparse_args(parser)
