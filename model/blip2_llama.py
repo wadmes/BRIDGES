@@ -15,7 +15,8 @@ from lavis.models.blip2_models.blip2 import (
     disabled_train,
 )
 from model.blip2 import Blip2Base
-from transformers import LlamaTokenizer
+from transformers import AutoImageProcessor, AutoTokenizer
+from transformers import AutoModel, AutoModelForCausalLM, Cache, PreTrainedModel, BitsAndBytesConfig
 from model.modeling_llama import LlamaForCausalLM
 
 
@@ -59,7 +60,7 @@ class Blip2Llama(Blip2Base):
         cross_attention_freq=2,
         lora_tuning=False,
         peft_dir='',
-        llm_model="decapoda-research/llama-7b-hf",
+        llm_model="meta-llama/Llama-3.2-1B",
         prompt="",
         args=None,
     ):
@@ -83,31 +84,29 @@ class Blip2Llama(Blip2Base):
             layer.intermediate = None
 
         ## initialize opt model
-        self.llm_tokenizer = LlamaTokenizer.from_pretrained(llm_model, use_fast=False, padding_side='right')
+        
+        self.llm_tokenizer = AutoTokenizer.from_pretrained(llm_model, use_fast=False)
         self.llm_tokenizer.add_special_tokens({'pad_token': '[PAD]'})
-        self.llm_tokenizer.add_special_tokens({'bos_token': '</s>'})
-        self.llm_tokenizer.add_special_tokens({'eos_token': '</s>'})
-        self.llm_tokenizer.add_special_tokens({'unk_token': '</s>'})
-        self.llm_model = LlamaForCausalLM.from_pretrained(llm_model, torch_dtype=torch.bfloat16)
+        self.llm_tokenizer.add_special_tokens({'additional_special_tokens': ['[START_NETLIST_GRAPH]','[END_NETLIST_GRAPH]', '<graph>']})
+
+        self.llm_model = AutoModelForCausalLM.from_pretrained(llm_model,                                                                    
+                                                            resume_download=True,
+                                                            torch_dtype=torch.bfloat16,
+                                                            quantization_config=BitsAndBytesConfig(load_in_4bit=True) if args.load_in_4bit else None,
+                                                            attn_implementation="flash_attention_2",)
         # self.llm_model = LlamaForCausalLM.from_pretrained(llm_model)
         self.llm_model.resize_token_embeddings(len(self.llm_tokenizer))
         
         self.lora_tuning = lora_tuning
         if lora_tuning:
-            if peft_dir:
-                self.llm_model = PeftModel.from_pretrained(self.llm_model, peft_dir, is_trainable=True)
-            else:
-                peft_config = LoraConfig(task_type=TaskType.CAUSAL_LM, inference_mode=False, r=8, lora_alpha=32, lora_dropout=0.1)
-                self.llm_model = get_peft_model(self.llm_model, peft_config)
-                self.llm_model.print_trainable_parameters()
+            peft_config = LoraConfig(task_type=TaskType.CAUSAL_LM, inference_mode=False, r=8, lora_alpha=32, lora_dropout=0.1)
+            self.llm_model = get_peft_model(self.llm_model, peft_config)
+            self.llm_model.print_trainable_parameters()
         else:
             for name, param in self.llm_model.named_parameters():
                 param.requires_grad = False
 
-        ## fixme: this is different from the original BLIP2
-        self.eos_token_id = self.llm_tokenizer(
-            "\n", add_special_tokens=False
-        ).input_ids[0]
+        self.eos_token_id = self.llm_tokenizer.eos_token_id
         self.pad_token_id = self.llm_tokenizer.pad_token_id
 
         self.llm_proj = nn.Linear(
@@ -119,7 +118,7 @@ class Blip2Llama(Blip2Base):
         # prompt_tokens = self.opt_tokenizer(self.prompt, return_tensors="pt")
         # self.prompt_length = prompt_tokens.attention_mask.sum(1)
 
-    def forward(self, batch):
+    def forward_old(self, batch):
         graphs, text_tokens, prompt_lens = batch
         graph_embeds, graph_masks = self.graph_encoder(graphs)
         if not self.tune_gnn:
@@ -160,6 +159,44 @@ class Blip2Llama(Blip2Base):
             return_dict=True,
             labels=targets,
             # use_cache=False,
+        )
+        loss = outputs.loss
+        return {"loss": loss}
+
+    def forward(self, batch):
+        # graphs, smiles_prompt_tokens, text_tokens
+        graphs, prompt_tokens, text_tokens = batch
+        graph_embeds, graph_masks = self.graph_encoder(graphs)
+        if not self.tune_gnn:
+            graph_embeds = graph_embeds.detach()
+        graph_embeds = self.ln_graph(graph_embeds)
+        device = graph_embeds.device
+        query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
+        query_output = self.Qformer.bert(
+            query_embeds=query_tokens,
+            encoder_hidden_states=graph_embeds,
+             # fixme: check whether this mask is correct
+            return_dict=True,
+        )
+        mol_tokens = self.llm_proj(query_output.last_hidden_state)
+        
+        empty_targets = torch.ones(prompt_tokens.attention_mask.shape, dtype=torch.long).to(device).fill_(-100)
+        targets = text_tokens.input_ids.masked_fill(
+            text_tokens.input_ids == self.llm_tokenizer.pad_token_id, -100
+        )
+        targets = torch.cat([empty_targets, targets], dim=1)
+
+        prompt_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
+        prompt_embeds[prompt_tokens.is_graph_token] = mol_tokens.flatten(0, 1) # change mol placeholder to the actual mol tokens from graph
+        inputs_embeds = self.llm_model.get_input_embeddings()(text_tokens.input_ids)
+        inputs_embeds = torch.cat((prompt_embeds, inputs_embeds), dim=1)
+        attention_mask = torch.cat([prompt_tokens.attention_mask, text_tokens.attention_mask], dim=1)
+        
+        outputs = self.llm_model(
+            inputs_embeds=inputs_embeds,
+            attention_mask=attention_mask,
+            return_dict=True,
+            labels=targets,
         )
         loss = outputs.loss
         return {"loss": loss}
@@ -212,55 +249,28 @@ class Blip2Llama(Blip2Base):
 
             attention_mask = torch.cat([atts_llm, prompt_tokens.attention_mask], dim=1)
             
-            if False:
-                if do_sample:
-                    query_embeds = inputs_llm.repeat_interleave(num_captions, dim=0)
-                    num_beams = 1
-                else:
-                    query_embeds = inputs_llm.repeat_interleave(num_beams, dim=0)
 
-                outputs = self.llm_model.generate(
-                    input_ids=prompt_tokens.input_ids,
-                    query_embeds=query_embeds,
-                    attention_mask=attention_mask,
-                    do_sample=do_sample,
-                    top_p=top_p,
-                    temperature=temperature,
-                    num_beams=num_beams,
-                    max_new_tokens=max_length,
-                    min_length=min_length,
-                    eos_token_id=self.eos_token_id,
-                    repetition_penalty=repetition_penalty,
-                    length_penalty=length_penalty,
-                    num_return_sequences=num_captions,
-                )
+            inputs_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
+            inputs_embeds = torch.cat([inputs_llm, inputs_embeds], dim=1)
+            attention_mask = torch.cat([atts_llm, prompt_tokens.attention_mask], dim=1)
 
-                prompt_length = prompt_tokens.input_ids.shape[1]
-                output_text = self.opt_tokenizer.batch_decode(
-                    outputs[:, prompt_length:], skip_special_tokens=True
-                )
-            else:
-                inputs_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
-                inputs_embeds = torch.cat([inputs_llm, inputs_embeds], dim=1)
-                attention_mask = torch.cat([atts_llm, prompt_tokens.attention_mask], dim=1)
-
-                outputs = self.llm_model.generate(
-                    inputs_embeds=inputs_embeds,
-                    attention_mask=attention_mask,
-                    do_sample=do_sample,
-                    top_p=top_p,
-                    temperature=temperature,
-                    num_beams=num_beams,
-                    max_length=max_length,
-                    min_length=min_length,
-                    pad_token_id=self.pad_token_id,
-                    eos_token_id=self.eos_token_id,
-                    repetition_penalty=repetition_penalty,
-                    length_penalty=length_penalty,
-                    num_return_sequences=num_captions,
-                    # use_cache=False,
-                )
-                # outputs[outputs == 0] = 2 # convert output id 0 to 2 (eos_token_id)
-                output_text = self.llm_tokenizer.batch_decode(outputs, skip_special_tokens=True)
+            outputs = self.llm_model.generate(
+                inputs_embeds=inputs_embeds,
+                attention_mask=attention_mask,
+                do_sample=do_sample,
+                top_p=top_p,
+                temperature=temperature,
+                num_beams=num_beams,
+                max_length=max_length,
+                min_length=min_length,
+                pad_token_id=self.pad_token_id,
+                eos_token_id=self.eos_token_id,
+                repetition_penalty=repetition_penalty,
+                length_penalty=length_penalty,
+                num_return_sequences=num_captions,
+                # use_cache=False,
+            )
+            # outputs[outputs == 0] = 2 # convert output id 0 to 2 (eos_token_id)
+            output_text = self.llm_tokenizer.batch_decode(outputs, skip_special_tokens=True)
             output_text = [text.strip() for text in output_text]
             return output_text
