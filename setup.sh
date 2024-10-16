@@ -7,7 +7,7 @@ module load cudnn8.6-cuda11.8/8.6.0.163  cuda11.8/toolkit/11.8.0 cuda11.8/fft/11
 
 python stage1.py --gtm --lm --batch_size 16 --match_batch_size 16 --tune_gnn
 
-python stage2.py --devices '1' --filename "stage2" --stage1_path "all_checkpoints/stage1_test/epoch=04.ckpt" --max_epochs 10 --mode pretrain --tune_gnn --llm_tune lora --inference_batch_size 4
+python stage2.py --filename "stage2" --stage1_path "all_checkpoints/stage1_test/epoch=04.ckpt" --max_epochs 10 --mode pretrain --tune_gnn --inference_batch_size 2 --batch_size 2
 
 python app.py --devices 0 --init_checkpoint "all_checkpoints/stage2/epoch=09-v2.ckpt"
 

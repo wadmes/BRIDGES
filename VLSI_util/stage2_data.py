@@ -5,9 +5,7 @@ from pytorch_lightning import LightningDataModule
 # from torch_geometric.loader import DataLoader
 from torch.utils.data import DataLoader, Dataset
 from torch_geometric.loader.dataloader import Collater
-from rdkit import RDLogger
 from torch_geometric.data import Batch
-RDLogger.DisableLog('rdApp.*')
 
 class TrainCollater:
     def __init__(self, tokenizer, text_max_len, mol_ph, graph_token_id, prompt):
@@ -163,7 +161,7 @@ class Stage2Netlist(LightningDataModule):
 
     def add_model_specific_args(parent_parser):
         parser = parent_parser.add_argument_group("Data module")
-        parser.add_argument('--num_workers', type=int, default=2)
+        parser.add_argument('--num_workers', type=int, default=4)
         parser.add_argument('--batch_size', type=int, default=8)
         parser.add_argument('--inference_batch_size', type=int, default=8)
         parser.add_argument('--use_smiles', action='store_true', default=False)

@@ -10,7 +10,6 @@ import torch.nn as nn
 from torch.cuda.amp import autocast as autocast
 from torch.nn import functional as F
 from peft import get_peft_config, get_peft_model, get_peft_model_state_dict, LoraConfig, TaskType, PeftModel
-from ogb.utils import smiles2graph
 from torch_geometric.loader.dataloader import Collater
 from torch_geometric.data import Data
 import numpy as np
@@ -41,15 +40,6 @@ def mask_by_len(input, lens, fill_value=0):
     mask = mask < lens.reshape(-1, 1)
     input[mask] = fill_value
     return input
-
-
-def smiles2data(smiles):
-    graph = smiles2graph(smiles)
-    x = torch.from_numpy(graph['node_feat'])
-    edge_index = torch.from_numpy(graph['edge_index'], )
-    edge_attr = torch.from_numpy(graph['edge_feat'])
-    data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
-    return data
 
 import re
 SPLIT_MARKER = f"SPL{1}T-TH{1}S-Pl3A5E"
@@ -359,6 +349,9 @@ class Blip2OPT(Blip2Base):
         output_text = [text.strip() for text in output_text]
         return output_text
 
+    """
+    This should be a deprecated function
+    """
     @torch.no_grad()
     def blip_qa(
         self, 
@@ -384,7 +377,7 @@ class Blip2OPT(Blip2Base):
         for p in prompts:
             text, smiles = smiles_handler(p, self.mol_token * self.num_query_token)
             prepared_prompts.append(text)
-            mol_list.extend([smiles2data(s) for s in smiles])
+            mol_list.extend(smiles) # this should be 
         
         prompt_tokens = self.opt_tokenizer(prepared_prompts,
                                            truncation=False,

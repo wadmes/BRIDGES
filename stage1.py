@@ -15,7 +15,7 @@ os.environ['OPENBLAS_NUM_THREADS'] = '1'
 warnings.filterwarnings('ignore', category=UserWarning, message='TypedStorage is deprecated')
 ## for A5000 gpus
 torch.set_float32_matmul_precision('medium') # can be medium (bfloat16), high (tensorfloat32), highest (float32)
-
+torch.set_default_dtype(torch.bfloat16)
 
 def main(args):
     pl.seed_everything(args.seed)
@@ -64,7 +64,6 @@ if __name__ == '__main__':
     parser.add_argument('--gtm', action='store_true', help='use graph-text matching or not', default=True)
     parser.add_argument('--lm', action='store_true', help='use language modeling or not', default=True)
     parser.add_argument('--mode', type=str, default='train')
-    parser.add_argument('--accelerator', type=str, default='gpu')
     parser.add_argument('--devices', type=str, default='0,1,2,3')
     parser.add_argument('--precision', type=str, default='bf16-mixed')
     parser.add_argument('--max_epochs', type=int, default=10)

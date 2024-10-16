@@ -282,24 +282,21 @@ class Blip2Stage2(pl.LightningModule):
         parser.add_argument('--drop_ratio', type=float, default=0.0)
         parser.add_argument('--tune_gnn', action='store_true', default=False)
         # Bert
-        parser.add_argument('--bert_hidden_dim', type=int, default=768, help='')
         parser.add_argument('--bert_name', type=str, default='scibert')
         parser.add_argument('--cross_attention_freq', type=int, default=2)
         parser.add_argument('--num_query_token', type=int, default=8)
         # OPT
-        parser.add_argument('--opt_model', type=str, default="meta-llama/Llama-3.2-3B")
+        parser.add_argument('--opt_model', type=str, default="meta-llama/Llama-3.2-3B", help='LLM name')
         # parser.add_argument('--prompt', type=str, default='a molecule of ')
         parser.add_argument('--num_beams', type=int, default=5)
         parser.add_argument('--do_sample', action='store_true', default=False)
-        parser.add_argument('--max_len', type=int, default=256)
+        parser.add_argument('--max_len', type=int, default=256, help = "used in generation")
         parser.add_argument('--min_len', type=int, default=8)
-        parser.add_argument('--llm_tune', type=str, default='freeze')
+        parser.add_argument('--llm_tune', type=str, default='lora')
         parser.add_argument('--peft_config', type=str, default=None)
         parser.add_argument('--peft_dir', type=str, default='')
 
         parser.add_argument('--save_every_n_epochs', type=int, default=1)
-        ## quantization
-        parser.add_argument('--load_in_8bit', action='store_true', default=False)
 
         ## lora config
         parser.add_argument('--lora_r', type=int, default=8)
@@ -307,7 +304,7 @@ class Blip2Stage2(pl.LightningModule):
         parser.add_argument('--lora_dropout', type=int, default=0.1)
 
         # optimization
-        parser.add_argument('--reaction_weight', type=float, default=1.0)
+        parser.add_argument('--reaction_weight', type=float, default=1.0, help = "deprecated in our project (for reaction)")
         parser.add_argument('--weight_decay', type=float, default=0.05, help='optimizer weight decay')
         parser.add_argument('--init_lr', type=float, default=1e-4, help='optimizer init learning rate')
         parser.add_argument('--min_lr', type=float, default=1e-5, help='optimizer min learning rate')

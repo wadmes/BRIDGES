@@ -16,7 +16,7 @@ from lavis.models.blip2_models.blip2 import (
 )
 from model.blip2 import Blip2Base
 from transformers import AutoImageProcessor, AutoTokenizer
-from transformers import AutoModel, AutoModelForCausalLM, Cache, PreTrainedModel, BitsAndBytesConfig
+from transformers import AutoModel, AutoModelForCausalLM, PreTrainedModel, BitsAndBytesConfig
 from model.modeling_llama import LlamaForCausalLM
 
 
@@ -99,7 +99,7 @@ class Blip2Llama(Blip2Base):
         
         self.lora_tuning = lora_tuning
         if lora_tuning:
-            peft_config = LoraConfig(task_type=TaskType.CAUSAL_LM, inference_mode=False, r=8, lora_alpha=32, lora_dropout=0.1)
+            peft_config = LoraConfig(task_type=TaskType.CAUSAL_LM, inference_mode=False, r=args.lora_r, lora_alpha=args.lora_alpha, lora_dropout=args.lora_dropout)
             self.llm_model = get_peft_model(self.llm_model, peft_config)
             self.llm_model.print_trainable_parameters()
         else:

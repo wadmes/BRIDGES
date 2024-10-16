@@ -142,7 +142,6 @@ class Blip2Stage1(pl.LightningModule):
         parser.add_argument('--drop_ratio', type=float, default=0.0)
         parser.add_argument('--tune_gnn', action='store_true', default=False)
         # Bert
-        parser.add_argument('--bert_hidden_dim', type=int, default=768, help='')
         parser.add_argument('--bert_name', type=str, default='scibert')
         parser.add_argument('--projection_dim', type=int, default=256)
         parser.add_argument('--cross_attention_freq', type=int, default=2)

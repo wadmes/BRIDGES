@@ -17,7 +17,9 @@ os.environ['OPENBLAS_NUM_THREADS'] = '1'
 warnings.filterwarnings('ignore', category=UserWarning, message='TypedStorage is deprecated')
 ## for A5000 gpus
 torch.set_float32_matmul_precision('medium') # can be medium (bfloat16), high (tensorfloat32), highest (float32)
-
+torch.set_default_dtype(torch.bfloat16)
+import wandb
+wandb.init()
 # strategy = strategies.DDPStrategy(find_unused_parameters=find_unused_parameters, start_method='spawn')
 # class MyDDPSpawnStrategy(strategies.DDPSpawnStrategy):
 #     def load_model_state_dict(self, checkpoint):
@@ -66,18 +68,18 @@ def main(args):
                                          save_last=True, 
                                          save_top_k=-1,
                                          save_on_train_epoch_end=True))
-    if len(args.devices.split(',')) > 1:
-        if args.strategy_name == 'fsdp':
-            strategy = strategies.DDPFullyShardedNativeStrategy()
-        elif args.strategy_name == 'deepspeed':
-            strategy = strategies.DeepSpeedStrategy(stage=3)
-        else:
-            strategy = MyDDPStrategy(find_unused_parameters=True, start_method='spawn')
-    else:
-        strategy = 'auto'
-        args.devices = eval(args.devices)
-    logger = WandbLogger(project='LLM-graph-stage2')
-    trainer = Trainer(accelerator=args.accelerator, devices=args.devices, precision=args.precision, max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, callbacks=callbacks, strategy=strategy, logger=logger,limit_val_batches=0, limit_test_batches=0)
+    # if len(args.devices.split(',')) > 1:
+    #     if args.strategy_name == 'fsdp':
+    #         strategy = strategies.DDPFullyShardedNativeStrategy()
+    #     elif args.strategy_name == 'deepspeed':
+    #         strategy = strategies.DeepSpeedStrategy(stage=3)
+    #     else:
+    #         strategy = MyDDPStrategy(find_unused_parameters=True, start_method='spawn')
+    # else:
+    #     strategy = 'auto'
+    #     args.devices = eval(args.devices)
+    logger = WandbLogger(project='LLM-graph-stage2', dir='./wandb-log')
+    trainer = Trainer(precision=args.precision, max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, callbacks=callbacks, logger=logger,limit_val_batches=0, limit_test_batches=0)
     if args.mode in {'pretrain', 'ft'}:
         trainer.fit(model, datamodule=dm, ckpt_path=args.ckpt_path)
     elif args.mode == 'eval':
@@ -92,17 +94,13 @@ def get_args():
     parser.add_argument('--seed', type=int, default=42, help='random seed')
     # MM settings
     parser.add_argument('--mode', type=str, default='pretrain')
-    parser.add_argument('--strategy_name', type=str, default=None)
-    parser.add_argument('--iupac_prediction', action='store_true', default=False)
+    parser.add_argument('--strategy_name', type=str, default='auto')
     parser.add_argument('--ckpt_path', type=str, default=None)
     # parser = Trainer.add_argparse_args(parser)
     parser = Blip2Stage2.add_model_specific_args(parser)  # add model args
     parser = Stage2Netlist.add_model_specific_args(parser)
-    parser.add_argument('--accelerator', type=str, default='gpu')
-    parser.add_argument('--devices', type=str, default='0,1,2,3')
-    parser.add_argument('--precision', type=str, default='bf16-mixed')
+    parser.add_argument('--precision', type=str, default='transformer-engine', help= "the precision argument for the trainer, could be ")
     parser.add_argument('--max_epochs', type=int, default=10)
-    parser.add_argument('--accumulate_grad_batches', type=int, default=1)
     parser.add_argument('--check_val_every_n_epoch', type=int, default=1)
     args = parser.parse_args()
 
