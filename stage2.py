@@ -99,7 +99,7 @@ def get_args():
     # parser = Trainer.add_argparse_args(parser)
     parser = Blip2Stage2.add_model_specific_args(parser)  # add model args
     parser = Stage2Netlist.add_model_specific_args(parser)
-    parser.add_argument('--precision', type=str, default='transformer-engine', help= "the precision argument for the trainer, could be ")
+    parser.add_argument('--precision', type=str, default='bf16-mixed', help= "the precision argument for the trainer, could be bf16-mixed, transformer-engine, for details, refer to https://lightning.ai/docs/pytorch/2.4.0/common/trainer.html#precision")
     parser.add_argument('--max_epochs', type=int, default=10)
     parser.add_argument('--check_val_every_n_epoch', type=int, default=1)
     args = parser.parse_args()

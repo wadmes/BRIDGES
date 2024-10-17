@@ -118,54 +118,9 @@ class Blip2Llama(Blip2Base):
         # prompt_tokens = self.opt_tokenizer(self.prompt, return_tensors="pt")
         # self.prompt_length = prompt_tokens.attention_mask.sum(1)
 
-    def forward_old(self, batch):
-        graphs, text_tokens, prompt_lens = batch
-        graph_embeds, graph_masks = self.graph_encoder(graphs)
-        if not self.tune_gnn:
-            graph_embeds = graph_embeds.detach()
-        graph_embeds = self.ln_graph(graph_embeds)
-        device = graph_embeds.device
-        query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
-        query_output = self.Qformer.bert(
-            query_embeds=query_tokens,
-            encoder_hidden_states=graph_embeds,
-             # fixme: check whether this mask is correct
-            return_dict=True,
-        )
-        inputs_llm = self.llm_proj(query_output.last_hidden_state)
-        atts_llm = torch.ones(inputs_llm.size()[:-1], dtype=torch.long).to(device)
-        targets = text_tokens.input_ids.masked_fill(
-            text_tokens.input_ids == self.llm_tokenizer.pad_token_id, -100
-        )
-        if self.prompt:
-            targets = mask_by_len(targets, prompt_lens, -100) # do not apply loss to the prompt
-            # targets[:, : self.prompt_length] = -100  # do not apply loss to the prompt
-        
-        empty_targets = (
-            torch.ones(atts_llm.size(), dtype=torch.long).to(device).fill_(-100)
-        )
-        targets = torch.cat([empty_targets, targets], dim=1)
-        # if self.lora_tuning:
-        #     inputs_embeds = self.llm_model.model.get_decoder().embed_tokens(text_tokens.input_ids)
-        # else:
-        #     inputs_embeds = self.llm_model.model.decoder.embed_tokens(text_tokens.input_ids)
-        inputs_embeds = self.llm_model.get_input_embeddings()(text_tokens.input_ids)
-        inputs_embeds = torch.cat([inputs_llm, inputs_embeds], dim=1)
-        attention_mask = torch.cat([atts_llm, text_tokens.attention_mask], dim=1)
-
-        outputs = self.llm_model(
-            inputs_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            return_dict=True,
-            labels=targets,
-            # use_cache=False,
-        )
-        loss = outputs.loss
-        return {"loss": loss}
-
     def forward(self, batch):
         # graphs, smiles_prompt_tokens, text_tokens
-        graphs, prompt_tokens, text_tokens = batch
+        graphs, prompt_tokens, text_tokens = batch # text is the function description
         graph_embeds, graph_masks = self.graph_encoder(graphs)
         if not self.tune_gnn:
             graph_embeds = graph_embeds.detach()
@@ -207,7 +162,7 @@ class Blip2Llama(Blip2Base):
         samples,
         do_sample=False,
         num_beams=5,
-        max_length=128,
+        max_length=256,
         min_length=1,
         top_p=0.9,
         repetition_penalty=1.0,
