@@ -38,13 +38,12 @@ class Stage1DM(LightningDataModule):
         self.tokenizer = tokenizer
         self.text_max_len = text_max_len
         print('Loading Netlist dataset...')
-        self.data_set = torch.load(root + '/netlist.pt')
         # dataset is InMemoryDataset, first random shuffle the dataset; No shuffle, (many repeat )
         # self.data_set = self.data_set.shuffle() 
         # divide the dataset into train, val, test by 3:1:1 (random seed = 1)
-        self.train_dataset = self.data_set
-        self.val_dataset = self.data_set
-        self.test_dataset = self.data_set
+        self.train_dataset = torch.load(root + '/train_dataset.pt',weights_only=True)
+        self.val_dataset = torch.load(root + '/val_dataset.pt',weights_only=True)
+        self.test_dataset = torch.load(root + '/test_dataset.pt',weights_only=True)
 
         self.val_match_loader = DataLoader(self.val_dataset, batch_size=self.match_batch_size, shuffle=False, num_workers=self.num_workers, pin_memory=False, drop_last=False, persistent_workers=True, collate_fn=TrainCollater(self.tokenizer, text_max_len))
         self.test_match_loader = DataLoader(self.test_dataset, batch_size=self.match_batch_size, shuffle=False, num_workers=self.num_workers, pin_memory=False, drop_last=False, persistent_workers=True, collate_fn=TrainCollater(self.tokenizer, text_max_len))
@@ -64,6 +63,6 @@ class Stage1DM(LightningDataModule):
         parser.add_argument('--batch_size', type=int, default=64)
         parser.add_argument('--match_batch_size', type=int, default=64)
         parser.add_argument('--root', type=str, default='/scratch/scratch/weili3')
-        parser.add_argument('--text_max_len', type=int, default=128)
+        parser.add_argument('--text_max_len', type=int, default=256)
         return parent_parser
     

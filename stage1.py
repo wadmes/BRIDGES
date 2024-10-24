@@ -44,7 +44,7 @@ def main(args):
     
     # logger = CSVLogger(save_dir=f'./all_checkpoints/{args.filename}/')
     logger = WandbLogger(project='LLM-graph')
-    trainer = Trainer(precision=args.precision, max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, callbacks=callbacks, logger = logger, limit_val_batches=0, limit_test_batches=0)
+    trainer = Trainer(precision=args.precision, max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, callbacks=callbacks, logger = logger)
     if args.mode == 'train':
         trainer.fit(model, datamodule=dm)
     elif args.mode == 'eval':
