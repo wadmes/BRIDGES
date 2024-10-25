@@ -9,7 +9,7 @@ from torch_geometric.nn import HGTConv, SAGEConv, GINConv,GraphConv,GATv2Conv,GA
 from torch.nn import Linear, Sequential, ReLU
 from torch_geometric.nn.aggr import MultiAggregation
 
-input_dim = 17 # totally 17 types of nodes
+input_dim = 14 # totally 17 types of nodes
 """
 Homogeneous GNNs
 """
@@ -37,9 +37,13 @@ class GNN(torch.nn.Module):
         if self.num_layer < 2:
             raise ValueError("Number of GNN layers must be greater than 1.")
 
-        self.x_embedding = torch.nn.Embedding(input_dim, emb_dim)
+        # nn.embedding for node type, we do not need one-hot anymore
+        self.type_embedding = torch.nn.Embedding(input_dim, emb_dim) # type embedding
+        self.output_embedding = torch.nn.Embedding(2, emb_dim) # output embedding (whether the gate is a output)
 
-        torch.nn.init.xavier_uniform_(self.x_embedding.weight.data)
+
+        torch.nn.init.xavier_uniform_(self.type_embedding.weight.data)
+        torch.nn.init.xavier_uniform_(self.output_embedding.weight.data)
 
         ###List of MLPs
         self.gnns = torch.nn.ModuleList()
@@ -72,7 +76,9 @@ class GNN(torch.nn.Module):
         else:
             raise ValueError("unmatched number of arguments.")
 
-        x = self.x_embedding(x)
+        type_emeb = self.type_embedding(x[...,0])
+        output_emeb = self.output_embedding(x[...,1])
+        x = type_emeb + output_emeb
 
         h_list = [x]
         for layer in range(self.num_layer):
@@ -135,9 +141,12 @@ class HeteGNN(torch.nn.Module):
             raise ValueError("Number of GNN layers must be greater than 1.")
 
         # nn.embedding for node type, we do not need one-hot anymore
-        self.x_embedding = torch.nn.Embedding(input_dim, emb_dim)
+        self.type_embedding = torch.nn.Embedding(input_dim, emb_dim) # type embedding
+        self.output_embedding = torch.nn.Embedding(2, emb_dim) # output embedding (whether the gate is a output)
 
-        torch.nn.init.xavier_uniform_(self.x_embedding.weight.data)
+
+        torch.nn.init.xavier_uniform_(self.type_embedding.weight.data)
+        torch.nn.init.xavier_uniform_(self.output_embedding.weight.data)
 
         ###List of MLPs
         self.gnns = torch.nn.ModuleList()
@@ -185,8 +194,9 @@ class HeteGNN(torch.nn.Module):
         else:
             raise ValueError("unmatched number of arguments. The number is {}".format(len(argv)), argv)
 
-        x_dict['node'] = self.x_embedding(x_dict['node'])
-
+        type_emeb = self.type_embedding(x_dict['node'][...,0])
+        output_emeb = self.output_embedding(x_dict['node'][...,1])
+        x_dict['node'] = type_emeb + output_emeb
         h_list = [x_dict['node']]
         for layer in range(self.num_layer):
             h = self.gnns[layer](x_dict, edge_index_dict)

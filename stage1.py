@@ -31,7 +31,7 @@ def main(args):
 
     tokenizer = model.blip2qformer.tokenizer
 
-    dm = Stage1DM(args.num_workers, args.batch_size, args.root, args.text_max_len, tokenizer,
+    dm = Stage1DM(args.num_workers, args.root, args.text_max_len, tokenizer,
                       args)
     model.val_match_loader = dm.val_match_loader
     model.test_match_loader = dm.test_match_loader
@@ -43,7 +43,7 @@ def main(args):
                                          save_top_k=-1))
     
     # logger = CSVLogger(save_dir=f'./all_checkpoints/{args.filename}/')
-    logger = WandbLogger(project='LLM-graph')
+    logger = WandbLogger(project='LLM-graph-stage1')
     trainer = Trainer(precision=args.precision, max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, callbacks=callbacks, logger = logger)
     if args.mode == 'train':
         trainer.fit(model, datamodule=dm)
