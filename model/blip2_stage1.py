@@ -16,7 +16,7 @@ class Blip2Stage1(pl.LightningModule):
         
         self.args = args
         self.rerank_cand_num = args.rerank_cand_num
-        multiple_device = isinstance(args.devices, list) and len(args.devices) > 1
+        multiple_device = torch.cuda.device_count() > 1
         self.blip2qformer = Blip2Qformer(args.gtm, args.lm, args.bert_name, args.temperature, args.gin_num_layers, args.gin_hidden_dim, args.drop_ratio, args.tune_gnn, args.num_query_token, args.cross_attention_freq, args.projection_dim, multiple_device)
     
         self.save_hyperparameters(args)
@@ -50,7 +50,7 @@ class Blip2Stage1(pl.LightningModule):
         return blip2_loss.loss
     
     def on_validation_epoch_end(self) -> None:
-        if self.current_epoch == 0 or (self.current_epoch + 1) % self.args.retrieval_eval_epoch != 0:
+        if (self.current_epoch + 1) % self.args.retrieval_eval_epoch != 0:
             return
         if self.trainer.global_rank == 0:
             ## for validation set
@@ -146,14 +146,14 @@ class Blip2Stage1(pl.LightningModule):
         parser.add_argument('--num_query_token', type=int, default=8)
         # optimization
         parser.add_argument('--weight_decay', type=float, default=0.05, help='optimizer weight decay')
-        parser.add_argument('--init_lr', type=float, default=1e-4, help='optimizer init learning rate')
+        parser.add_argument('--init_lr', type=float, default=1e-5, help='optimizer init learning rate')
         parser.add_argument('--min_lr', type=float, default=1e-5, help='optimizer min learning rate')
-        parser.add_argument('--warmup_lr', type=float, default=1e-6, help='optimizer warmup learning rate')
+        parser.add_argument('--warmup_lr', type=float, default=1e-7, help='optimizer warmup learning rate')
         parser.add_argument('--warmup_steps', type=int, default=1000, help='optimizer warmup steps')
         parser.add_argument('--lr_decay_rate', type=float, default=0.9, help='optimizer lr decay rate')
         parser.add_argument('--scheduler', type=str, default='linear_warmup_cosine_lr', help='type of scheduler') # or linear_warmup_step_lr
         parser.add_argument('--init_checkpoint', type=str, default='')
-        parser.add_argument('--retrieval_eval_epoch', type=int, default=50)
+        parser.add_argument('--retrieval_eval_epoch', type=int, default=1)
         return parent_parser
 
 

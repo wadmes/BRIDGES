@@ -44,8 +44,8 @@ class Stage1DM(LightningDataModule):
 
         # match loader is to check the RAG peformance (only difference with the original dataloader is the batch size )
 
-        self.val_match_loader = DataLoader(self.val_dataset, batch_size=self.match_batch_size, shuffle=False, num_workers=self.num_workers, pin_memory=False, drop_last=False, persistent_workers=True, collate_fn=TrainCollater(self.tokenizer, text_max_len))
-        self.test_match_loader = DataLoader(self.test_dataset, batch_size=self.match_batch_size, shuffle=False, num_workers=self.num_workers, pin_memory=False, drop_last=False, persistent_workers=True, collate_fn=TrainCollater(self.tokenizer, text_max_len))
+        self.val_match_loader = DataLoader(self.val_dataset, batch_size=self.match_batch_size, shuffle=True, num_workers=self.num_workers, pin_memory=False, drop_last=False, persistent_workers=True, collate_fn=TrainCollater(self.tokenizer, text_max_len))
+        self.test_match_loader = DataLoader(self.test_dataset, batch_size=self.match_batch_size, shuffle=True, num_workers=self.num_workers, pin_memory=False, drop_last=False, persistent_workers=True, collate_fn=TrainCollater(self.tokenizer, text_max_len))
     
     def train_dataloader(self):
         loader = DataLoader(self.train_dataset, batch_size=self.train_batch_size, shuffle=True, num_workers=self.num_workers, pin_memory=False, drop_last=True, persistent_workers=True, collate_fn=TrainCollater(self.tokenizer, self.text_max_len))
@@ -53,7 +53,7 @@ class Stage1DM(LightningDataModule):
 
     def val_dataloader(self):
 
-        loader = DataLoader(self.val_dataset, batch_size=self.eval_batch_size, shuffle=False, num_workers=self.num_workers, pin_memory=False, drop_last=False, persistent_workers=True, collate_fn=TrainCollater(self.tokenizer, self.text_max_len))
+        loader = DataLoader(self.val_dataset, batch_size=self.eval_batch_size, shuffle=True, num_workers=self.num_workers, pin_memory=False, drop_last=False, persistent_workers=True, collate_fn=TrainCollater(self.tokenizer, self.text_max_len))
         return loader
 
     def add_model_specific_args(parent_parser):

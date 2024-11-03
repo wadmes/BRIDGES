@@ -301,7 +301,7 @@ class Blip2Qformer(Blip2Base):
             text_mask_world = mask
             with torch.no_grad():
                 weights_t2g = F.softmax(sim_t2g, dim=1) + 1e-4
-                weights_t2g.fill_diagonal_(0)
+                weights_t2g.fill_diagonal_(0) #Set the diagonal values to zero to prevent selecting the correct (positive) text-graph pair as a negative.
                 weights_g2t = F.softmax(sim_g2t, dim=1) + 1e-4
                 weights_g2t.fill_diagonal_(0)
 
@@ -350,7 +350,6 @@ class Blip2Qformer(Blip2Base):
                 encoder_attention_mask=graph_atts_all,
                 return_dict=True,
             )
-
             vl_embeddings = output_itm.last_hidden_state[:, : query_tokens_itm.size(1), :] # keep query tokens only
             vl_output = self.gtm_head(vl_embeddings)
             logits = vl_output.mean(dim=1)
@@ -359,6 +358,7 @@ class Blip2Qformer(Blip2Base):
                 [torch.ones(batch_size, dtype=torch.long), torch.zeros(2 * batch_size, dtype=torch.long)],
                 dim=0,
             ).to(text.device)
+
             loss_gtm = F.cross_entropy(logits, itm_labels)
 
         ##================= Graph Captioning ========================##
