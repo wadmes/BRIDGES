@@ -148,8 +148,9 @@ class netlistDataset(InMemoryDataset):
     rtl_list: the list of rtl_id
     rtl_path: the path to the rtl json file.
     type: graph type for the netlist, could be 'hetedata' or 'homodata'
+    add_syn: whether add synthesis efforts in function description
     """
-    def __init__(self, path, rtl_list, rtl_path, type):
+    def __init__(self, path, rtl_list, rtl_path, type, add_syn = True):
         super(netlistDataset,self).__init__()
         print('Loading netlist dataset, path: {}, type: {}'.format(path,type))
         netlist_file = json.load(open(path))
@@ -174,8 +175,14 @@ class netlistDataset(InMemoryDataset):
                 self.graphs.append(networkx2hetedata(networkx_graph))
             else:
                 raise NotImplementedError
-            
+            if add_syn:
+                syn_efforts = netlist_file[key]['synthesis_efforts']
+                generic_effort = syn_efforts.split('_')[0]
+                mapping_effort = syn_efforts.split('_')[1]
+                optimization_effort = syn_efforts.split('_')[2]
+                func_desc += ' The synthesis efforts are: generic_effort - ' + generic_effort + ', mapping_effort - ' + mapping_effort + ', optimization_effort - ' + optimization_effort + '.'
             self.graphs[-1].text = func_desc
+            self.graphs[-1].rtl_id = int(netlist_file[key]['rtl_id'])
         print('error files: ', error_files)
     def len(self):
         return len(self.graphs)
@@ -186,12 +193,42 @@ class netlistDataset(InMemoryDataset):
         return self.graphs[index], self.graphs[index].text
     
 
+def create_datasets(netlist_path, rtl_path, seed = 42, train_ratio = 0.9, eval_ratio = 0.05, type ='hetedata'):
+    rtl_file = json.load(open(rtl_path))
+    rtl_id_list = list(rtl_file.keys()) # list of rtl_id, which is the key of the rtl_file
+    syn_success_rtl_id_list = []
+    # first report a simple statistics, how many `synthesis_status` is false, how many dataflow_status is false
+    import numpy as np
+    stat_matrix = np.zeros((2,2)) # synthesis_status, dataflow_status
+    for key in rtl_file.keys():
+        stat_matrix[int(rtl_file[key]['synthesis_status'])][int(rtl_file[key]['dataflow_status'])] += 1
+        if rtl_file[key]['synthesis_status']:
+            syn_success_rtl_id_list.append(int(key))
+    print('synthesis_status (first dim), dataflow_status (second dim)')
+    print(stat_matrix)
+    print("success synthesis: ", len(syn_success_rtl_id_list))
+    import random
+    rtl_id_list = syn_success_rtl_id_list
+    random.seed(seed)
+    random.shuffle(rtl_id_list)
+    train_size = int(len(rtl_id_list) * train_ratio)
+    eval_size = int(len(rtl_id_list) * eval_ratio)
+    test_size = int(len(rtl_id_list) - train_size - eval_size)
+    train_list = rtl_id_list[:train_size]
+    eval_list = rtl_id_list[train_size:train_size+eval_size]
+    test_list = rtl_id_list[train_size+eval_size:]
+    print("load netlist dataset: ", netlist_path)
+    print('train size: {}, eval size: {}, test size: {}'.format(train_size,eval_size,test_size))
+    train_dataset = netlistDataset(netlist_path,train_list, rtl_path, type)
+    eval_dataset = netlistDataset(netlist_path,eval_list, rtl_path, type)
+    test_dataset = netlistDataset(netlist_path,test_list, rtl_path, type)
+    return train_dataset, eval_dataset, test_dataset
 
 
 """
 Create train/eval/test dataset
 """
-def create_datasets(netlist_path, rtl_path, seed = 42, train_ratio = 0.8, eval_ratio = 0.1, type ='hetedata'):
+def create_datasets_old(netlist_path, rtl_path, seed = 42, train_ratio = 0.8, eval_ratio = 0.1, type ='hetedata'):
     rtl_file = json.load(open(rtl_path))
     rtl_id_list = list(rtl_file.keys()) # list of rtl_id, which is the key of the rtl_file
     syn_success_rtl_id_list = []
@@ -233,6 +270,6 @@ if __name__ == '__main__':
     parser.add_argument('--rtl_path', type=str, default='/home/weili3/VLSI-LLM/data_collection/rtl_data/rtl.json')
     args = parser.parse_args()
     train_dataset, eval_dataset, test_dataset = create_datasets(args.netlist_path,args.rtl_path, "hetedata")
-    torch.save(train_dataset,'train_dataset.pt')
-    torch.save(eval_dataset,'eval_dataset.pt')
-    torch.save(test_dataset,'test_dataset.pt')
+    torch.save(train_dataset,'train_w_syn.pt')
+    torch.save(eval_dataset,'eval_w_syn.pt')
+    torch.save(test_dataset,'test_w_syn.pt')

@@ -49,61 +49,84 @@ class Blip2Stage1(pl.LightningModule):
         self.log("val_loss", float(blip2_loss.loss), batch_size=batch_size, sync_dist=True)
         return blip2_loss.loss
     
-    def on_validation_epoch_end(self) -> None:
+    def on_train_epoch_end(self) -> None:
         if (self.current_epoch + 1) % self.args.retrieval_eval_epoch != 0:
             return
+        # set the model to eval mode
+        self.blip2qformer.eval()
         if self.trainer.global_rank == 0:
             ## for validation set
             # rec20 means recall@20 (top-20)
             g2t_acc, t2g_acc, g2t_rec20, t2g_rec20, \
             g2t_rerank_acc, t2g_rerank_acc, g2t_rerank_rec20, t2g_rerank_rec20,\
-            graph_rep_total, text_rep_total, _, _, _, _ = \
+            rtlid_total, graph_rep_total, text_rep_total, _, _, _, _, \
+            g2t_rtlid_acc, t2g_rtlid_acc, g2t_rtlid_rec20, t2g_rtlid_rec20, \
+            g2t_rerank_rtlid_acc, t2g_rerank_rtlid_acc, g2t_rerank_rtlid_rec20, t2g_rerank_rtlid_rec20 = \
                 eval_retrieval_inbatch_with_rerank(self.blip2qformer, self.val_match_loader, self.device)
-            self.log("val_inbatch_g2t_acc", g2t_acc, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("val_inbatch_t2g_acc", t2g_acc, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("val_inbatch_g2t_rec20", g2t_rec20, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("val_inbatch_t2g_rec20", t2g_rec20, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("val_inbatch_g2t_acc", g2t_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("val_inbatch_t2g_acc", t2g_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("val_inbatch_g2t_rec20", g2t_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("val_inbatch_t2g_rec20", t2g_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
 
-            self.log("rerank_val_inbatch_g2t_acc", g2t_rerank_acc, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("rerank_val_inbatch_t2g_acc", t2g_rerank_acc, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("rerank_val_inbatch_g2t_rec20", g2t_rerank_rec20, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("rerank_val_inbatch_t2g_rec20", t2g_rerank_rec20, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("rerank_val_inbatch_g2t_acc", g2t_rerank_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("rerank_val_inbatch_t2g_acc", t2g_rerank_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("rerank_val_inbatch_g2t_rec20", g2t_rerank_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("rerank_val_inbatch_t2g_rec20", t2g_rerank_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
             
-            g2t_acc, g2t_rec20, t2g_acc, t2g_rec20, _ = \
-                eval_retrieval_fullset(graph_rep_total, text_rep_total, self.device)
-            self.log("val_fullset_g2t_acc", g2t_acc, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("val_fullset_t2g_acc", t2g_acc, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("val_fullset_g2t_rec20", g2t_rec20, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("val_fullset_t2g_rec20", t2g_rec20, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("val_inbatch_g2t_rtlid_acc", g2t_rtlid_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("val_inbatch_t2g_rtlid_acc", t2g_rtlid_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("val_inbatch_g2t_rtlid_rec20", g2t_rtlid_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("val_inbatch_t2g_rtlid_rec20", t2g_rtlid_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("rerank_val_inbatch_g2t_rtlid_acc", g2t_rerank_rtlid_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("rerank_val_inbatch_t2g_rtlid_acc", t2g_rerank_rtlid_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("rerank_val_inbatch_g2t_rtlid_rec20", g2t_rerank_rtlid_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("rerank_val_inbatch_t2g_rtlid_rec20", t2g_rerank_rtlid_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
+
+            g2t_acc, g2t_rec20, t2g_acc, t2g_rec20, _, g2t_id_accu, g2t_id_rec20, t2g_id_accu, t2g_id_rec20 = \
+                eval_retrieval_fullset(rtlid_total, graph_rep_total, text_rep_total, self.device)
+            self.log("val_fullset_g2t_acc", g2t_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("val_fullset_t2g_acc", t2g_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("val_fullset_g2t_rec20", g2t_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("val_fullset_t2g_rec20", t2g_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("val_fullset_g2t_rtlid_acc", g2t_id_accu, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("val_fullset_g2t_rtlid_rec20", g2t_id_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("val_fullset_t2g_rtlid_acc", t2g_id_accu, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("val_fullset_t2g_rtlid_rec20", t2g_id_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
 
             ## for test set
             g2t_acc, t2g_acc, g2t_rec20, t2g_rec20, \
             g2t_rerank_acc, t2g_rerank_acc, g2t_rerank_rec20, t2g_rerank_rec20, \
-            graph_rep_total, text_rep_total, graph_feat_total, graph_mask_total, text_total, text_mask_total = \
+            rtlid_total, graph_rep_total, text_rep_total, graph_feat_total, graph_mask_total, text_total, text_mask_total, \
+            g2t_rtlid_acc, t2g_rtlid_acc, g2t_rtlid_rec20, t2g_rtlid_rec20, \
+            g2t_rerank_rtlid_acc, t2g_rerank_rtlid_acc, g2t_rerank_rtlid_rec20, t2g_rerank_rtlid_rec20 = \
                 eval_retrieval_inbatch_with_rerank(self.blip2qformer, self.test_match_loader, self.device)
-            self.log("rerank_test_inbatch_g2t_acc", g2t_rerank_acc, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("rerank_test_inbatch_t2g_acc", t2g_rerank_acc, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("rerank_test_inbatch_g2t_rec20", g2t_rerank_rec20, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("rerank_test_inbatch_t2g_rec20", t2g_rerank_rec20, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("rerank_test_inbatch_g2t_acc", g2t_rerank_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("rerank_test_inbatch_t2g_acc", t2g_rerank_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("rerank_test_inbatch_g2t_rec20", g2t_rerank_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("rerank_test_inbatch_t2g_rec20", t2g_rerank_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
 
-            self.log("test_inbatch_g2t_acc", g2t_acc, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("test_inbatch_t2g_acc", t2g_acc, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("test_inbatch_g2t_rec20", g2t_rec20, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("test_inbatch_t2g_rec20", t2g_rec20, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("test_inbatch_g2t_acc", g2t_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("test_inbatch_t2g_acc", t2g_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("test_inbatch_g2t_rec20", g2t_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("test_inbatch_t2g_rec20", t2g_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
             
-            g2t_acc, g2t_rec20, t2g_acc, t2g_rec20, sim_g2t = \
-                eval_retrieval_fullset(graph_rep_total, text_rep_total, self.device)
-            self.log("test_fullset_g2t_acc", g2t_acc, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("test_fullset_t2g_acc", t2g_acc, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("test_fullset_g2t_rec20", g2t_rec20, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("test_fullset_t2g_rec20", t2g_rec20, sync_dist=False, batch_size = self.args.batch_size)
+            g2t_acc, g2t_rec20, t2g_acc, t2g_rec20, sim_g2t, g2t_id_accu, g2t_id_rec20, t2g_id_accu, t2g_id_rec20 = \
+                eval_retrieval_fullset(rtlid_total, graph_rep_total, text_rep_total, self.device)
+            self.log("test_fullset_g2t_acc", g2t_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("test_fullset_t2g_acc", t2g_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("test_fullset_g2t_rec20", g2t_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("test_fullset_t2g_rec20", t2g_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("test_fullset_g2t_rtlid_acc", g2t_id_accu, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("test_fullset_g2t_rtlid_rec20", g2t_id_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("test_fullset_t2g_rtlid_acc", t2g_id_accu, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("test_fullset_t2g_rtlid_rec20", t2g_id_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
 
             g2t_acc, g2t_rec20, t2g_acc, t2g_rec20 = \
                 eval_retrieval_fullset_for_rerank(self.blip2qformer, sim_g2t, graph_feat_total, graph_mask_total, text_total, text_mask_total, self.rerank_cand_num, self.device)
-            self.log("rerank_test_fullset_g2t_acc", g2t_acc, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("rerank_test_fullset_t2g_acc", t2g_acc, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("rerank_test_fullset_g2t_rec20", g2t_rec20, sync_dist=False, batch_size = self.args.batch_size)
-            self.log("rerank_test_fullset_t2g_rec20", t2g_rec20, sync_dist=False, batch_size = self.args.batch_size)
+            self.log("rerank_test_fullset_g2t_acc", g2t_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("rerank_test_fullset_t2g_acc", t2g_acc, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("rerank_test_fullset_g2t_rec20", g2t_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
+            self.log("rerank_test_fullset_t2g_rec20", t2g_rec20, sync_dist=False, batch_size = self.args.match_batch_size)
             del graph_rep_total, text_rep_total
 
     def training_step(self, batch, batch_idx):
@@ -249,11 +272,12 @@ def eval_retrieval_inbatch(model, dataloader, device=None):
 
 
 @torch.no_grad()
-def eval_retrieval_fullset(graph_rep, text_rep, device):    
+def eval_retrieval_fullset(rtlid_total, graph_rep, text_rep, device):    
     N = graph_rep.shape[0]
     B = 8
     text_rep = text_rep.to(device)
     sim_g2t = []
+    id_mat = rtlid_total.unsqueeze(0) == rtlid_total.unsqueeze(1) # shape = [N, N], True if the same id
     for i in tqdm(range(0, N, B)):
         l_graph_rep = graph_rep[i:i+B].to(device)
         l_sim_q2t = (l_graph_rep.unsqueeze(1) @ text_rep.unsqueeze(-1)).squeeze() # shape = [B, 1, num_qs, D]; shape = [N, D, 1]; output shape = [B, N, num_qs]
@@ -262,10 +286,27 @@ def eval_retrieval_fullset(graph_rep, text_rep, device):
     sim_g2t = torch.cat(sim_g2t, dim=0).cpu() # shape = [N, N]
     
     rank_g2t = []
+    g2t_id_accu = []
+    g2t_id_rec20 = []
+    t2g_id_accu = []
+    t2g_id_rec20 = []
     for i in range(0, N, B):
         sorted_ids = torch.argsort(sim_g2t[i:i+B].to(device), descending=True)
         rank_g2t.append((sorted_ids == torch.arange(i,i+sorted_ids.shape[0], device=device).reshape(-1, 1)).int().argmax(dim=-1))
+        g2t_id_accu.append(cal_topk_recall_w_ID(id_mat[i:i+B], sim_g2t[i:i+B], 1))
+        g2t_id_rec20.append(cal_topk_recall_w_ID(id_mat[i:i+B], sim_g2t[i:i+B], 20))
+        t2g_id_accu.append(cal_topk_recall_w_ID(id_mat[i:i+B], sim_g2t.T[i:i+B], 1))
+        t2g_id_rec20.append(cal_topk_recall_w_ID(id_mat[i:i+B], sim_g2t.T[i:i+B], 20))
+
     rank_g2t = torch.cat(rank_g2t, dim=0) 
+    g2t_id_accu = torch.cat(g2t_id_accu, dim=0).float().mean()
+    g2t_id_rec20 = torch.cat(g2t_id_rec20, dim=0).float().mean()
+    t2g_id_accu = torch.cat(t2g_id_accu, dim=0).float().mean()
+    t2g_id_rec20 = torch.cat(t2g_id_rec20, dim=0).float().mean()
+    g2t_id_accu = round(g2t_id_accu * 100, 2)
+    g2t_id_rec20 = round(g2t_id_rec20 * 100, 2)
+    t2g_id_accu = round(t2g_id_accu * 100, 2)
+    t2g_id_rec20 = round(t2g_id_rec20 * 100, 2)
     
     rank_t2g = []
     for i in range(0, N, B):
@@ -281,7 +322,7 @@ def eval_retrieval_fullset(graph_rep, text_rep, device):
     g2t_rec20 = round(g2t_rec20 * 100, 2)
     t2g_acc = round(t2g_acc * 100, 2)
     t2g_rec20 = round(t2g_rec20 * 100, 2)
-    return g2t_acc, g2t_rec20, t2g_acc, t2g_rec20, sim_g2t
+    return g2t_acc, g2t_rec20, t2g_acc, t2g_rec20, sim_g2t, g2t_id_accu, g2t_id_rec20, t2g_id_accu, t2g_id_rec20
 
 
 @torch.no_grad()
@@ -357,8 +398,18 @@ def eval_retrieval_inbatch_with_rerank(model, dataloader, device=None):
     g2t_rerank_rec20 = 0
     t2g_rerank_rec20 = 0
 
+    g2t_rtlid_acc = 0
+    t2g_rtlid_acc = 0
+    g2t_rtlid_rec20 = 0
+    t2g_rtlid_rec20 = 0
+    g2t_rerank_rtlid_acc = 0
+    t2g_rerank_rtlid_acc = 0
+    g2t_rerank_rtlid_rec20 = 0
+    t2g_rerank_rtlid_rec20 = 0
+
     graph_rep_total = []  
     text_rep_total = []
+    rtlid_total = []
     
     graph_feat_total = [] 
     graph_mask_total = []
@@ -374,6 +425,7 @@ def eval_retrieval_inbatch_with_rerank(model, dataloader, device=None):
         aug = aug.to(device)
         text = text.to(device)
         text_mask = text_mask.to(device)
+
         graph_rep, graph_feat, graph_mask = model.graph_forward(aug) # shape = [B, num_qs, D]
         text_rep = model.text_forward(text, text_mask) # shape = [B, D]
 
@@ -404,16 +456,14 @@ def eval_retrieval_inbatch_with_rerank(model, dataloader, device=None):
         text = text.repeat(B, 1) # shape = [B * B, text_len]
         text_mask = text_mask.repeat(B, 1) # shape = [B * B, text_len]
 
-        if False:
-            gtm_sim = model.compute_gtm(graph_feat, graph_mask, text, text_mask).reshape(B, B)
-        else:
-            ## batched reranking
-            batch_size = 64
-            gtm_sim = []
-            for i in range(0, graph_feat.shape[0], batch_size):
-                gtm_sim_local = model.compute_gtm(graph_feat[i:i+batch_size], graph_mask[i:i+batch_size], text[i:i+batch_size], text_mask[i:i+batch_size])
-                gtm_sim.append(gtm_sim_local)
-            gtm_sim = torch.cat(gtm_sim, dim=0).reshape(B, B)
+
+        ## batched reranking
+        batch_size = 64
+        gtm_sim = []
+        for i in range(0, graph_feat.shape[0], batch_size):
+            gtm_sim_local = model.compute_gtm(graph_feat[i:i+batch_size], graph_mask[i:i+batch_size], text[i:i+batch_size], text_mask[i:i+batch_size])
+            gtm_sim.append(gtm_sim_local)
+        gtm_sim = torch.cat(gtm_sim, dim=0).reshape(B, B)
 
         rerank_sim = sim_g2t + gtm_sim
 
@@ -429,8 +479,23 @@ def eval_retrieval_inbatch_with_rerank(model, dataloader, device=None):
         t2g_rerank_acc += float(hit_t2g[:, 0].sum())
         t2g_rerank_rec20 += float(hit_t2g[:, :20].sum())
 
+
+        ## RTL Id based rank results
+        graph_ids = aug.rtl_id # shape = [B]
+        rtlid_total.append(graph_ids)
+        id_mat = graph_ids.unsqueeze(0) == graph_ids.unsqueeze(1) # shape = [B, B], True if the same id
+        g2t_rtlid_acc += cal_topk_recall_w_ID(id_mat, sim_g2t, 1).sum()
+        t2g_rtlid_acc += cal_topk_recall_w_ID(id_mat.T, sim_g2t.T, 1).sum()
+        g2t_rtlid_rec20 += cal_topk_recall_w_ID(id_mat, sim_g2t, 20).sum()
+        t2g_rtlid_rec20 += cal_topk_recall_w_ID(id_mat.T, sim_g2t.T, 20).sum()
+        g2t_rerank_rtlid_acc += cal_topk_recall_w_ID(id_mat, rerank_sim, 1).sum()
+        t2g_rerank_rtlid_acc += cal_topk_recall_w_ID(id_mat.T, rerank_sim.T, 1).sum()
+        g2t_rerank_rtlid_rec20 += cal_topk_recall_w_ID(id_mat, rerank_sim, 20).sum()
+        t2g_rerank_rtlid_rec20 += cal_topk_recall_w_ID(id_mat.T, rerank_sim.T, 20).sum()
+
     graph_rep_total = torch.cat(graph_rep_total, dim=0)
     text_rep_total = torch.cat(text_rep_total, dim=0)
+    rtlid_total = torch.cat(rtlid_total, dim=0)
     graph_feat_total = pad_and_concat(graph_feat_total)
     graph_mask_total = pad_and_concat(graph_mask_total)
     text_total = torch.cat(text_total, dim=0)
@@ -445,6 +510,34 @@ def eval_retrieval_inbatch_with_rerank(model, dataloader, device=None):
     t2g_rerank_acc = round(t2g_rerank_acc / allcnt * 100, 2)
     g2t_rerank_rec20 = round(g2t_rerank_rec20 / allcnt * 100, 2)
     t2g_rerank_rec20 = round(t2g_rerank_rec20 / allcnt * 100, 2)
+
+    g2t_rtlid_acc = round(g2t_rtlid_acc / allcnt * 100, 2)
+    t2g_rtlid_acc = round(t2g_rtlid_acc / allcnt * 100, 2)
+    g2t_rtlid_rec20 = round(g2t_rtlid_rec20 / allcnt * 100, 2)
+    t2g_rtlid_rec20 = round(t2g_rtlid_rec20 / allcnt * 100, 2)
+    g2t_rerank_rtlid_acc = round(g2t_rerank_rtlid_acc / allcnt * 100, 2)
+    t2g_rerank_rtlid_acc = round(t2g_rerank_rtlid_acc / allcnt * 100, 2)
+    g2t_rerank_rtlid_rec20 = round(g2t_rerank_rtlid_rec20 / allcnt * 100, 2)
+    t2g_rerank_rtlid_rec20 = round(t2g_rerank_rtlid_rec20 / allcnt * 100, 2)
     return g2t_acc, t2g_acc, g2t_rec20, t2g_rec20, \
         g2t_rerank_acc, t2g_rerank_acc, g2t_rerank_rec20, t2g_rerank_rec20, \
-        graph_rep_total, text_rep_total, graph_feat_total, graph_mask_total, text_total, text_mask_total
+        rtlid_total, graph_rep_total, text_rep_total,  graph_feat_total, graph_mask_total, text_total, text_mask_total, \
+        g2t_rtlid_acc, t2g_rtlid_acc, g2t_rtlid_rec20, t2g_rtlid_rec20, \
+        g2t_rerank_rtlid_acc, t2g_rerank_rtlid_acc, g2t_rerank_rtlid_rec20, t2g_rerank_rtlid_rec20
+
+
+"""
+calculate topk recall with ID matrix and similarity matrix
+id_mat: [B, N], True if the same id
+sim_mat: [B, N], similarity matrix
+"""
+def cal_topk_recall_w_ID(id_mat, sim_mat, topk):
+    B = sim_mat.shape[0]
+    N = sim_mat.shape[1]
+    top_k_indices = sim_mat.topk(topk, dim=1).indices  # shape = [B, top_k]
+    # Check if the top 20 matches for each graph have the same ID
+    recall_k_matches = id_mat[torch.arange(B).unsqueeze(1), top_k_indices]  # shape = [B, top_k]
+    
+    # Recall@20 is the mean fraction of matches with the same ID within the top 20
+    recall_k = (recall_k_matches.sum(dim=1) > 0).float() # shape = [B]
+    return recall_k
