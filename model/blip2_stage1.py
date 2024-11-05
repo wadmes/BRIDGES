@@ -303,10 +303,10 @@ def eval_retrieval_fullset(rtlid_total, graph_rep, text_rep, device):
     g2t_id_rec20 = torch.cat(g2t_id_rec20, dim=0).float().mean()
     t2g_id_accu = torch.cat(t2g_id_accu, dim=0).float().mean()
     t2g_id_rec20 = torch.cat(t2g_id_rec20, dim=0).float().mean()
-    g2t_id_accu = round(g2t_id_accu * 100, 2)
-    g2t_id_rec20 = round(g2t_id_rec20 * 100, 2)
-    t2g_id_accu = round(t2g_id_accu * 100, 2)
-    t2g_id_rec20 = round(t2g_id_rec20 * 100, 2)
+    g2t_id_accu = round(float(g2t_id_accu) * 100, 2)
+    g2t_id_rec20 = round(float(g2t_id_rec20) * 100, 2)
+    t2g_id_accu = round(float(t2g_id_accu) * 100, 2)
+    t2g_id_rec20 = round(float(t2g_id_rec20) * 100, 2)
     
     rank_t2g = []
     for i in range(0, N, B):
@@ -511,14 +511,14 @@ def eval_retrieval_inbatch_with_rerank(model, dataloader, device=None):
     g2t_rerank_rec20 = round(g2t_rerank_rec20 / allcnt * 100, 2)
     t2g_rerank_rec20 = round(t2g_rerank_rec20 / allcnt * 100, 2)
 
-    g2t_rtlid_acc = round(g2t_rtlid_acc / allcnt * 100, 2)
-    t2g_rtlid_acc = round(t2g_rtlid_acc / allcnt * 100, 2)
-    g2t_rtlid_rec20 = round(g2t_rtlid_rec20 / allcnt * 100, 2)
-    t2g_rtlid_rec20 = round(t2g_rtlid_rec20 / allcnt * 100, 2)
-    g2t_rerank_rtlid_acc = round(g2t_rerank_rtlid_acc / allcnt * 100, 2)
-    t2g_rerank_rtlid_acc = round(t2g_rerank_rtlid_acc / allcnt * 100, 2)
-    g2t_rerank_rtlid_rec20 = round(g2t_rerank_rtlid_rec20 / allcnt * 100, 2)
-    t2g_rerank_rtlid_rec20 = round(t2g_rerank_rtlid_rec20 / allcnt * 100, 2)
+    g2t_rtlid_acc = round(float(g2t_rtlid_acc) / allcnt * 100, 2)
+    t2g_rtlid_acc = round(float(t2g_rtlid_acc) / allcnt * 100, 2)
+    g2t_rtlid_rec20 = round(float(g2t_rtlid_rec20) / allcnt * 100, 2)
+    t2g_rtlid_rec20 = round(float(t2g_rtlid_rec20) / allcnt * 100, 2)
+    g2t_rerank_rtlid_acc = round(float(g2t_rerank_rtlid_acc) / allcnt * 100, 2)
+    t2g_rerank_rtlid_acc = round(float(t2g_rerank_rtlid_acc) / allcnt * 100, 2)
+    g2t_rerank_rtlid_rec20 = round(float(g2t_rerank_rtlid_rec20) / allcnt * 100, 2)
+    t2g_rerank_rtlid_rec20 = round(float(t2g_rerank_rtlid_rec20) / allcnt * 100, 2)
     return g2t_acc, t2g_acc, g2t_rec20, t2g_rec20, \
         g2t_rerank_acc, t2g_rerank_acc, g2t_rerank_rec20, t2g_rerank_rec20, \
         rtlid_total, graph_rep_total, text_rep_total,  graph_feat_total, graph_mask_total, text_total, text_mask_total, \

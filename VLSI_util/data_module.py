@@ -38,9 +38,9 @@ class Stage1DM(LightningDataModule):
         self.tokenizer = tokenizer
         self.text_max_len = text_max_len
         print('Loading Netlist dataset...')
-        self.train_dataset = torch.load(root + '/train_dataset.pt')
-        self.val_dataset = torch.load(root + '/val_dataset.pt')
-        self.test_dataset = torch.load(root + '/test_dataset.pt')
+        self.train_dataset = torch.load(root + 'train_w_syn.pt')
+        self.val_dataset = torch.load(root + 'eval_w_syn.pt')
+        self.test_dataset = torch.load(root + 'test_w_syn.pt')
 
         # match loader is to check the RAG peformance (only difference with the original dataloader is the batch size )
 
