@@ -7,7 +7,7 @@ from pytorch_lightning import Trainer, strategies
 import pytorch_lightning.callbacks as plc 
 from pytorch_lightning.loggers import WandbLogger
 from model.blip2_stage1 import Blip2Stage1
-from VLSI_util.data_module import Stage1DM
+from VLSI_util.data_module import Stage1DM_v2
 from VLSI_util.data import netlistDataset
 
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
@@ -31,7 +31,7 @@ def main(args):
 
     tokenizer = model.blip2qformer.tokenizer
 
-    dm = Stage1DM(args.num_workers, args.root, args.text_max_len, tokenizer,
+    dm = Stage1DM_v2(args.num_workers, args.root, args.text_max_len, tokenizer,
                       args)
     model.val_match_loader = dm.val_match_loader
     model.test_match_loader = dm.test_match_loader
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     # parser.add_argument('--save_every_n_epochs', type=int, default=1)
     # parser = Trainer.add_argparse_args(parser)
     parser = Blip2Stage1.add_model_specific_args(parser)  # add model args
-    parser = Stage1DM.add_model_specific_args(parser)
+    parser = Stage1DM_v2.add_model_specific_args(parser)
     # parser.set_defaults(accelerator='gpu',
     #                     devices='0,1,2,3',
     #                     precision='bf16',

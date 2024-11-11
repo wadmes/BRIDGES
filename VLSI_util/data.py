@@ -194,6 +194,23 @@ class netlistDataset(InMemoryDataset):
         return self.graphs[index], self.graphs[index].text
     
 
+class stage1dataset(InMemoryDataset):
+    """
+    used for Stage1DM_v2
+    """
+    def __init__(self, graphs):
+        super(netlistDataset,self).__init__()
+        self.graphs = graphs
+
+    def len(self):
+        return len(self.graphs)
+
+    def __getitem__(self, index):
+        self.graphs[index]['node','pos','node'].edge_index = self.graphs[index]['node','pos','node'].edge_index.long()
+        self.graphs[index]['node','inv','node'].edge_index = self.graphs[index]['node','inv','node'].edge_index.long()
+        return self.graphs[index], self.graphs[index].text
+    
+
 
 """
 In v2, we will not split dataset here (instead, we will split the dataset in the training script)
