@@ -4,12 +4,12 @@ import torch
 import warnings
 import pytorch_lightning as pl
 from pytorch_lightning import Trainer, strategies
+# import DDPStrategy(find_unused_parameters=True, static_graph=True)
 import pytorch_lightning.callbacks as plc 
 from pytorch_lightning.loggers import WandbLogger
-from model.blip2_stage1 import Blip2Stage1
-from VLSI_util.data_module import Stage1DM_v2
-from VLSI_util.data import netlistDataset
-
+from model.blip2_stage1_textonly import Blip2Stage1
+from pytorch_lightning.strategies import DDPStrategy
+from VLSI_util.data_module_textonly import Stage1DM_v2
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
 ## for pyg bug
 warnings.filterwarnings('ignore', category=UserWarning, message='TypedStorage is deprecated')
@@ -42,8 +42,8 @@ def main(args):
                                          save_top_k=-1))
     
     # logger = CSVLogger(save_dir=f'./all_checkpoints/{args.filename}/')
-    logger = WandbLogger(project='LLM-graph-stage1-v2-newdata')
-    trainer = Trainer(fast_dev_run = False,precision=args.precision, max_epochs=args.max_epochs, val_check_interval=0.5, callbacks=callbacks, logger = logger)
+    logger = WandbLogger(project='LLM-graph-stage10-textonly')
+    trainer = Trainer(fast_dev_run = False,precision=args.precision, max_epochs=args.max_epochs, val_check_interval=0.5, callbacks=callbacks, logger = logger,strategy=DDPStrategy(find_unused_parameters=True, static_graph=True))
     if args.mode == 'train':
         trainer.fit(model, datamodule=dm)
     elif args.mode == 'eval':
@@ -56,12 +56,12 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--filename', type=str, default="stage1_test")
+    parser.add_argument('--filename', type=str, default="stage1_text")
     # GPU
     parser.add_argument('--seed', type=int, default=42, help='random seed')
     # MM settings
-    parser.add_argument('--gtm', action='store_true', help='use graph-text matching or not', default=True)
-    parser.add_argument('--lm', action='store_true', help='use language modeling or not', default=True)
+    parser.add_argument('--gtm', action='store_true', help='use graph-text matching or not', default=False)
+    parser.add_argument('--lm', action='store_true', help='use language modeling or not', default=False)
     parser.add_argument('--mode', type=str, default='train')
     parser.add_argument('--devices', type=str, default='0,1,2,3')
     parser.add_argument('--precision', type=str, default='bf16-mixed')

@@ -1,11 +1,11 @@
 import torch
-from model.blip2qformer import Blip2Qformer
+from model.blip2qformer_textonly import Blip2Qformer
 import pytorch_lightning as pl
 from torch import optim
 from lavis.common.optims import LinearWarmupCosineLRScheduler, LinearWarmupStepLRScheduler
 from tqdm import tqdm
 from model.help_funcs import AttrDict
-
+from torch.nn import functional as F
 
 
 class Blip2Stage1(pl.LightningModule):
@@ -158,7 +158,7 @@ class Blip2Stage1(pl.LightningModule):
         parser.add_argument('--rerank_cand_num', type=int, default=8)
         
         # GIN
-        parser.add_argument('--gin_hidden_dim', type=int, default=512)
+        parser.add_argument('--gin_hidden_dim', type=int, default=256)
         parser.add_argument('--gin_num_layers', type=int, default=5)
         parser.add_argument('--drop_ratio', type=float, default=0.0)
         parser.add_argument('--tune_gnn', action='store_true', default=False)
@@ -223,15 +223,31 @@ def eval_retrieval_inbatch(model, dataloader, device=None):
     text_total = []
     text_mask_total = []
     
-    for batch in tqdm(dataloader, desc='retrieval'):
-        aug, text, text_mask = batch
+    for batch in tqdm(dataloader):
+        aug, text, text_mask, netlist_text, netlist_mask, rtl_text, rtl_mask = batch
         text_total.append(text)
         text_mask_total.append(text_mask)
 
         aug = aug.to(device)
         text = text.to(device)
         text_mask = text_mask.to(device)
-        graph_rep, graph_feat, graph_mask = model.graph_forward(aug) # shape = [B, num_qs, D]
+        netlist_output = model.Qformer_netlist.bert(netlist_text, attention_mask=netlist_mask, return_dict=True)
+        netlist_feats = model.text_proj(netlist_output.last_hidden_state[:, 0:2, :])
+
+        batch_node = netlist_feats # shape = [B, 2, D], use netlist as graph_feats
+        graph_rep = batch_node
+        batch_size = batch_node.shape[0]
+        graph_mask = torch.ones((batch_size, 2), dtype=torch.long, device=batch_node.device)
+        # query_tokens = model.query_tokens.expand(batch_node.shape[0], -1, -1)
+        # query_output = model.Qformer.bert(
+        #     query_embeds=query_tokens,
+        #     encoder_hidden_states=batch_node,
+        #     use_cache=True,
+        #     return_dict=True,
+        # )
+        # graph_rep = model.graph_proj(query_output.last_hidden_state)
+        graph_feat = F.normalize(graph_rep, p=2, dim=-1)
+        # graph_rep, graph_feat, graph_mask = model.graph_forward(aug) # shape = [B, num_qs, D]
         text_rep = model.text_forward(text, text_mask) # shape = [B, D]
 
         sim_q2t = (graph_rep.unsqueeze(1) @ text_rep.unsqueeze(-1)).squeeze() # shape = [B, 1, num_qs, D]; shape = [B, D, 1]; output shape = [B, B, num_qs]
@@ -420,16 +436,37 @@ def eval_retrieval_inbatch_with_rerank(model, dataloader, device=None):
     text_total = []
     text_mask_total = []
     
-    for batch in tqdm(dataloader,desc='re-ranking retrieval'):
-        aug, text, text_mask = batch
+    for batch in tqdm(dataloader):
+        aug, text, text_mask, netlist_text, netlist_mask, rtl_text, rtl_mask = batch
         text_total.append(text)
         text_mask_total.append(text_mask)
 
         aug = aug.to(device)
         text = text.to(device)
         text_mask = text_mask.to(device)
+        netlist_text = netlist_text.to(device)
+        netlist_mask = netlist_mask.to(device)
 
-        graph_rep, graph_feat, graph_mask = model.graph_forward(aug) # shape = [B, num_qs, D]
+
+
+        netlist_output = model.Qformer_netlist.bert(netlist_text, attention_mask=netlist_mask, return_dict=True)
+        netlist_feats = model.text_proj(netlist_output.last_hidden_state[:, 0:2, :])
+
+        batch_node = netlist_feats # shape = [B, 2, D], use netlist as graph_feats
+        graph_rep = batch_node
+        batch_size = batch_node.shape[0]
+        graph_mask = torch.ones((batch_size, 2), dtype=torch.long, device=batch_node.device)
+        # query_tokens = model.query_tokens.expand(batch_node.shape[0], -1, -1)
+        # query_output = model.Qformer.bert(
+        #     query_embeds=query_tokens,
+        #     encoder_hidden_states=batch_node,
+        #     use_cache=True,
+        #     return_dict=True,
+        # )
+        # graph_rep = model.graph_proj(query_output.last_hidden_state)
+        graph_feat = F.normalize(graph_rep, p=2, dim=-1)
+
+        # graph_rep, graph_feat, graph_mask = model.graph_forward(aug) # shape = [B, num_qs, D]
         text_rep = model.text_forward(text, text_mask) # shape = [B, D]
 
         sim_q2t = (graph_rep.unsqueeze(1) @ text_rep.unsqueeze(-1)).squeeze() # shape = [B, 1, num_qs, D]; shape = [B, D, 1]; output shape = [B, B, num_qs]
@@ -461,14 +498,15 @@ def eval_retrieval_inbatch_with_rerank(model, dataloader, device=None):
 
 
         ## batched reranking
-        batch_size = 64
-        gtm_sim = []
-        for i in range(0, graph_feat.shape[0], batch_size):
-            gtm_sim_local = model.compute_gtm(graph_feat[i:i+batch_size], graph_mask[i:i+batch_size], text[i:i+batch_size], text_mask[i:i+batch_size])
-            gtm_sim.append(gtm_sim_local)
-        gtm_sim = torch.cat(gtm_sim, dim=0).reshape(B, B)
+        # batch_size = 64
+        # gtm_sim = []
+        # for i in range(0, graph_feat.shape[0], batch_size):
+        #     gtm_sim_local = model.compute_gtm(graph_feat[i:i+batch_size], graph_mask[i:i+batch_size], text[i:i+batch_size], text_mask[i:i+batch_size])
+        #     gtm_sim.append(gtm_sim_local)
+        # gtm_sim = torch.cat(gtm_sim, dim=0).reshape(B, B)
 
-        rerank_sim = sim_g2t + gtm_sim
+        # rerank_sim = sim_g2t + gtm_sim
+        rerank_sim = sim_g2t
 
         ## g2t rerank
         sorted_ids = torch.argsort(rerank_sim, descending=True).cpu() # shape = [B, B]

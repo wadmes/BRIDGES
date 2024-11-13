@@ -199,7 +199,7 @@ class stage1dataset(InMemoryDataset):
     used for Stage1DM_v2
     """
     def __init__(self, graphs):
-        super(netlistDataset,self).__init__()
+        super(stage1dataset,self).__init__()
         self.graphs = graphs
 
     def len(self):
