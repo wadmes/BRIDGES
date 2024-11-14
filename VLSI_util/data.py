@@ -269,6 +269,8 @@ def create_datasets_v2(netlist_path, rtl_path, seed = 42, train_ratio = 0.9, eva
         graphs[-1].rtl_id = int(netlist_file[key]['rtl_id'])
         graphs[-1].netlist = netlist_str[:2048]
         graphs[-1].rtl = rtl_file[str(netlist_file[key]['rtl_id'])]['verilog'][:2048]
+        graphs[-1].netlist_id = int(key)
+        graphs[-1].synthesis_efforts = netlist_file[key]['synthesis_efforts']
         # graphs[-1].name_mapping = rtl_file[str(netlist_file[key]['rtl_id'])]['name_mapping']
         graphs[-1].consistent_label = rtl_file[str(netlist_file[key]['rtl_id'])]['consistent_label']
 

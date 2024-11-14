@@ -64,20 +64,20 @@ parser.add_argument('--train_ratio', type=float, default=0.9, help='ratio of tra
 args = parser.parse_args()
 
 
-orig_data = torch.load(args.graph_path)
-for g in tqdm.tqdm(orig_data['graphs']):
-    delattr(g, 'name_mapping')
-torch.save(orig_data, args.graph_path)
+# orig_data = torch.load(args.graph_path)
+# for g in tqdm.tqdm(orig_data['graphs']):
+#     delattr(g, 'name_mapping')
+# torch.save(orig_data, args.graph_path)
 
 
-files = ['_train.pt', '_val.pt', '_test.pt']
-for file in files:
-    orig_data = torch.load(args.graph_path.replace('.pt', file))
-    for g in tqdm.tqdm(orig_data):
-        del g.name_mapping
-    torch.save(orig_data, args.graph_path.replace('.pt', file))
+# files = ['_train.pt', '_val.pt', '_test.pt']
+# for file in files:
+#     orig_data = torch.load(args.graph_path.replace('.pt', file))
+#     for g in tqdm.tqdm(orig_data):
+#         del g.name_mapping
+#     torch.save(orig_data, args.graph_path.replace('.pt', file))
 
-exit()
+# exit()
 
 
 # load the graph

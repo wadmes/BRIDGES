@@ -95,6 +95,7 @@ class Blip2Llama(Blip2Base):
                                                             quantization_config=BitsAndBytesConfig(load_in_4bit=True) if args.load_in_4bit else None,
                                                             attn_implementation="flash_attention_2",)
         # self.llm_model = LlamaForCausalLM.from_pretrained(llm_model)
+        # self.gradient_checkpointing_enable()
         self.llm_model.resize_token_embeddings(len(self.llm_tokenizer))
         
         self.lora_tuning = lora_tuning
@@ -142,11 +143,7 @@ class Blip2Llama(Blip2Base):
         targets = torch.cat([empty_targets, targets], dim=1)
 
         prompt_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
-        # print(prompt_tokens.is_graph_token) 
-        # print(prompt_tokens.is_graph_token.shape) torch.Size([2, 24]) 2 is the batch size, 24 is the prompt token length
-        # print(prompt_embeds[prompt_tokens.is_graph_token].shape) here, when you set A[B], B is boolean, A[B] return a 1-dimensional tensor
-
-        prompt_embeds[prompt_tokens.is_graph_token] = graph_tokens.flatten(0, 1) # change mol placeholder to the actual mol tokens from graph
+        prompt_embeds[prompt_tokens.is_graph_token] = graph_tokens.flatten(0, 1) # change graph placeholder to the actual graph tokens from graph
         inputs_embeds = self.llm_model.get_input_embeddings()(text_tokens.input_ids)
         inputs_embeds = torch.cat((prompt_embeds, inputs_embeds), dim=1)
         attention_mask = torch.cat([prompt_tokens.attention_mask, text_tokens.attention_mask], dim=1)

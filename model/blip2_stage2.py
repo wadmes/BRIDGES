@@ -316,7 +316,7 @@ class Blip2Stage2(pl.LightningModule):
         parser.add_argument('--stage1_path', type=str, default='')
         parser.add_argument('--stage2_path', type=str, default='')
         parser.add_argument('--init_checkpoint', type=str, default='')
-        parser.add_argument('--caption_eval_epoch', type=int, default=10)
+        parser.add_argument('--caption_eval_epoch', type=int, default=1)
         # load_in_4bit, default is False
         parser.add_argument('--load_in_4bit', action='store_true', default=False)
         return parent_parser

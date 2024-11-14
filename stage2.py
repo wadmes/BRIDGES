@@ -16,10 +16,8 @@ os.environ['OPENBLAS_NUM_THREADS'] = '1'
 ## for pyg bug
 warnings.filterwarnings('ignore', category=UserWarning, message='TypedStorage is deprecated')
 ## for A5000 gpus
-torch.set_float32_matmul_precision('medium') # can be medium (bfloat16), high (tensorfloat32), highest (float32)
-torch.set_default_dtype(torch.bfloat16)
-import wandb
-wandb.init()
+# torch.set_float32_matmul_precision('medium') # can be medium (bfloat16), high (tensorfloat32), highest (float32)
+# torch.set_default_dtype(torch.bfloat16)
 # strategy = strategies.DDPStrategy(find_unused_parameters=find_unused_parameters, start_method='spawn')
 # class MyDDPSpawnStrategy(strategies.DDPSpawnStrategy):
 #     def load_model_state_dict(self, checkpoint):
