@@ -142,11 +142,10 @@ class Blip2Llama(Blip2Base):
         targets = torch.cat([empty_targets, targets], dim=1)
 
         prompt_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
-        print(prompt_embeds[prompt_tokens.is_graph_token].shape)
-        print(graph_tokens.flatten(0, 1).shape)
-        print(prompt_embeds.shape)
-        print("get the shape!")
-        exit()
+        # print(prompt_tokens.is_graph_token) 
+        # print(prompt_tokens.is_graph_token.shape) torch.Size([2, 24]) 2 is the batch size, 24 is the prompt token length
+        # print(prompt_embeds[prompt_tokens.is_graph_token].shape) here, when you set A[B], B is boolean, A[B] return a 1-dimensional tensor
+
         prompt_embeds[prompt_tokens.is_graph_token] = graph_tokens.flatten(0, 1) # change mol placeholder to the actual mol tokens from graph
         inputs_embeds = self.llm_model.get_input_embeddings()(text_tokens.input_ids)
         inputs_embeds = torch.cat((prompt_embeds, inputs_embeds), dim=1)

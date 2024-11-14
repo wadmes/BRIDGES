@@ -107,12 +107,14 @@ class Stage2Netlist(LightningDataModule):
             this_train = torch.load(ds_path.replace('.pt', '_train.pt'))
             this_val = torch.load(ds_path.replace('.pt', '_val.pt'))
             this_test = torch.load(ds_path.replace('.pt', '_test.pt'))
+            for split_dataset in [this_train, this_val, this_test]:
+                for graph in split_dataset:
+                    graph.rtl_id += max_rtlid
             train_graphs.extend(this_train)
             val_graphs.extend(this_val)
             test_graphs.extend(this_test)
             max_rtlid += max(ds['rtl_id_list']) + 1
             print(f"max_rtlid: {max_rtlid}")
-            del split_datasets
         print(f"Use MIXED DATASETS! train: {len(train_graphs)}, val: {len(val_graphs)}, test: {len(test_graphs)}")
         self.train_dataset = stage1dataset(train_graphs)
         self.val_dataset = stage1dataset(val_graphs)

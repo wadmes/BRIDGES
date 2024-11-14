@@ -110,6 +110,9 @@ class Stage1DM_v2(LightningDataModule):
                 this_train = torch.load(ds_path.replace('.pt', '_train.pt'))
                 this_val = torch.load(ds_path.replace('.pt', '_val.pt'))
                 this_test = torch.load(ds_path.replace('.pt', '_test.pt'))
+                for split_dataset in [this_train, this_val, this_test]:
+                    for graph in split_dataset:
+                        graph.rtl_id += max_rtlid
                 train_graphs.extend(this_train)
                 val_graphs.extend(this_val)
                 test_graphs.extend(this_test)

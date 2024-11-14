@@ -6,7 +6,7 @@ I decide to write a script to split and save data (train, val, test) for the sta
 import torch
 import argparse
 import random
-
+import tqdm
 """
 Random split the graph list based on the given ratio in ratio_list.
 ratio_list: list of float, sum(ratio_list) == 1
@@ -62,6 +62,22 @@ parser.add_argument('--seed', type=int, default=42, help='random seed')
 parser.add_argument('--train_ratio', type=float, default=0.9, help='ratio of training data')
 
 args = parser.parse_args()
+
+
+orig_data = torch.load(args.graph_path)
+for g in tqdm.tqdm(orig_data['graphs']):
+    delattr(g, 'name_mapping')
+torch.save(orig_data, args.graph_path)
+
+
+files = ['_train.pt', '_val.pt', '_test.pt']
+for file in files:
+    orig_data = torch.load(args.graph_path.replace('.pt', file))
+    for g in tqdm.tqdm(orig_data):
+        del g.name_mapping
+    torch.save(orig_data, args.graph_path.replace('.pt', file))
+
+exit()
 
 
 # load the graph

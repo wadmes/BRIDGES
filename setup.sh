@@ -10,7 +10,7 @@ python stage1.py --gtm --lm --tune_gnn
 
 python stage1-textonly.py --gtm --lm --tune_gnn
 
-python stage2.py --filename "stage2" --stage1_path "all_checkpoints/stage1_test/epoch=04.ckpt" --max_epochs 10 --mode pretrain --tune_gnn --inference_batch_size 2 --batch_size 2
+python stage2.py --stage1_path "all_checkpoints/stage1_test/1113.ckpt" --tune_gnn --inference_batch_size 2 --batch_size 2
 
 python app.py --devices 0 --init_checkpoint "all_checkpoints/stage2/epoch=08-v1.ckpt"
 

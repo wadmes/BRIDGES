@@ -9,7 +9,7 @@ from pytorch_lightning.loggers import WandbLogger
 from model.blip2_stage2 import Blip2Stage2
 from VLSI_util.stage2_data import Stage2Netlist
 from VLSI_util.data import netlistDataset
-
+from pytorch_lightning.strategies import DDPStrategy
 # torch.set_default_dtype(torch.float16)
 
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
@@ -58,7 +58,7 @@ def main(args):
     else:
         raise NotImplementedError
     # data
-    dm = Stage2Netlist(args.mode, args.num_workers, args.batch_size, args.root, args.text_max_len, tokenizer, args)
+    dm = Stage2Netlist(args.mode, args.num_workers, args.batch_size, args.text_max_len, tokenizer, args)
     callbacks = []
     ## fixme save only used parameters
     # callbacks.append(plc.ModelCheckpoint(dirpath="all_checkpoints/"+args.filename+"/", every_n_epochs=10, save_top_k=-1))
@@ -79,7 +79,7 @@ def main(args):
     #     strategy = 'auto'
     #     args.devices = eval(args.devices)
     logger = WandbLogger(project='LLM-graph-stage2', dir='./wandb-log')
-    trainer = Trainer(precision=args.precision, max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, callbacks=callbacks, logger=logger,limit_val_batches=0, limit_test_batches=0)
+    trainer = Trainer(fast_dev_run = False,precision=args.precision, max_epochs=args.max_epochs, check_val_every_n_epoch=args.check_val_every_n_epoch, callbacks=callbacks, logger=logger, strategy=DDPStrategy(find_unused_parameters=True, static_graph=True))
     if args.mode in {'pretrain', 'ft'}:
         trainer.fit(model, datamodule=dm, ckpt_path=args.ckpt_path)
     elif args.mode == 'eval':
@@ -90,7 +90,7 @@ def main(args):
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--filename', type=str, default="stage2_test")
+    parser.add_argument('--filename', type=str, default="stage2-v1")
     parser.add_argument('--seed', type=int, default=42, help='random seed')
     # MM settings
     parser.add_argument('--mode', type=str, default='pretrain')
