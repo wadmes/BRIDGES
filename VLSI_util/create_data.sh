@@ -1,1 +1,2 @@
-python data_textonly.py --netlist_path /home/weili3/VLSI-LLM/data_collection/RTLCoder26532/netlist_data/netlist.json --rtl_path /home/weili3/VLSI-LLM/data_collection/RTLCoder26532/rtl_data/rtl.json --name RTLCoder26532-textonly
+# python data_textonly.py --netlist_path /home/weili3/VLSI-LLM/data_collection/RTLCoder26532/netlist_data/netlist.json --rtl_path /home/weili3/VLSI-LLM/data_collection/RTLCoder26532/rtl_data/rtl.json --name RTLCoder26532-textonly
+python data.py --netlist_path /home/weili3/VLSI-LLM/data_collection/RTLCoder26532/netlist_data/netlist.json --rtl_path /home/weili3/VLSI-LLM/data_collection/RTLCoder26532/rtl_data/rtl.json --name RTLCoder26532

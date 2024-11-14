@@ -68,54 +68,7 @@ class Stage1DM(LightningDataModule):
         return parent_parser
     
 
-import random
-from collections import defaultdict
 
-"""
-Random split the graph list based on the given ratio in ratio_list.
-ratio_list: list of float, sum(ratio_list) == 1
-graph_list: list of graph
-rtl_list: list of rtl id to be randomly split
-
-First randomly split the rtl_list based on the ratio_list
-Then split the graph_list based on the rtl_list using graph.rtl_id
-
-Return:
-new_graph_list: list of graph list, len(new_graph_list) == len(ratio_list)
-"""
-def random_split_by_rtl(ratio_list, rtl_list, graph_list, seed = 42):
-    # Set the random seed for reproducibility
-    random.seed(seed)
-    
-    # Shuffle the rtl_list
-    random.shuffle(rtl_list)
-    
-    # Calculate the split points for the rtl_list based on ratio_list
-    total_rtl = len(rtl_list)
-    split_points = [int(r * total_rtl) for r in ratio_list]
-    
-    # Adjust split points to ensure the sum matches the length of rtl_list
-    cumulative_splits = []
-    cumulative_sum = 0
-    for split_point in split_points[:-1]:  # Leave the last part to catch all remaining elements
-        cumulative_sum += split_point
-        cumulative_splits.append(cumulative_sum)
-    split_rtl_lists = [rtl_list[start:end] for start, end in zip([0] + cumulative_splits, cumulative_splits + [None])]
-    
-    # Create a lookup for fast rtl_id to split index mapping
-    rtl_to_split_index = {}
-    for i, split in enumerate(split_rtl_lists):
-        for rtl_id in split:
-            rtl_to_split_index[rtl_id] = i
-    
-    # Partition graphs based on the rtl_id split
-    new_graph_list = [[] for _ in ratio_list]
-    for graph in graph_list:
-        split_index = rtl_to_split_index.get(graph.rtl_id)
-        if split_index is not None:
-            new_graph_list[split_index].append(graph)
-    
-    return new_graph_list
 
 """
 v2 version will handle train, eval, and test dataset separately
@@ -143,46 +96,23 @@ class Stage1DM_v2(LightningDataModule):
         self.tokenizer = tokenizer
         self.text_max_len = text_max_len
         print('Loading Netlist dataset...')
-
-        raw_datasets = [torch.load(ds_path) for ds_path in dataset_path]
         if mix is False:
             print("Not mix the dataset")
-            if len(raw_datasets) == 2:
-                self.train_dataset = stage1dataset(raw_datasets[0]['graphs'])
-                split_datasets = random_split_by_rtl([0.5,0.5], raw_datasets[1]['rtl_id_list'], raw_datasets[1]['graphs'], seed)
-                self.val_dataset = stage1dataset(split_datasets[0])
-                self.test_dataset = stage1dataset(split_datasets[1])
-                print(f"Use TWO DATASETS! train: {len(self.train_dataset)}, val: {len(self.val_dataset)}, test: {len(self.test_dataset)}")
-                del split_datasets, raw_datasets
-            elif len(raw_datasets) == 1:
-                split_datasets = random_split_by_rtl([train_test_ratio, (1-train_test_ratio)/2, (1-train_test_ratio)/2], raw_datasets[0]['rtl_id_list'], raw_datasets[0]['graphs'], seed)
-                self.train_dataset = stage1dataset(split_datasets[0])
-                self.val_dataset = stage1dataset(split_datasets[1])
-                self.test_dataset = stage1dataset(split_datasets[2])
-                del split_datasets, raw_datasets
-                print(f"Use ONE DATASET! train: {len(self.train_dataset)}, val: {len(self.val_dataset)}, test: {len(self.test_dataset)}")
-            elif len(raw_datasets) == 3:
-                self.train_dataset = stage1dataset(raw_datasets[0]['graphs'])
-                self.val_dataset = stage1dataset(raw_datasets[1]['graphs'])
-                self.test_dataset = stage1dataset(raw_datasets[2]['graphs'])
-                print(f"Use THREE DATASETS! train: {len(self.train_dataset)}, val: {len(self.val_dataset)}, test: {len(self.test_dataset)}")
-            else:
-                raise ValueError("Invalid dataset path length")
+            raise NotImplementedError
         else:
             # if mix datasets, we need to change the rtl_id
             train_graphs = []
             val_graphs = []
             test_graphs = []
             max_rtlid = 0
-            for ds in raw_datasets:
-                print(f"Dataset length: {len(ds['graphs'])}")
-                split_datasets = random_split_by_rtl([train_test_ratio, (1-train_test_ratio)/2, (1-train_test_ratio)/2], ds['rtl_id_list'], ds['graphs'], seed)
-                for split_dataset in split_datasets:
-                    for graph in split_dataset:
-                        graph.rtl_id += max_rtlid
-                train_graphs.extend(split_datasets[0])
-                val_graphs.extend(split_datasets[1])
-                test_graphs.extend(split_datasets[2])
+            for ds_path in dataset_path:
+                ds = torch.load(ds_path)
+                this_train = torch.load(ds_path.replace('.pt', '_train.pt'))
+                this_val = torch.load(ds_path.replace('.pt', '_val.pt'))
+                this_test = torch.load(ds_path.replace('.pt', '_test.pt'))
+                train_graphs.extend(this_train)
+                val_graphs.extend(this_val)
+                test_graphs.extend(this_test)
                 max_rtlid += max(ds['rtl_id_list']) + 1
                 print(f"max_rtlid: {max_rtlid}")
                 del split_datasets

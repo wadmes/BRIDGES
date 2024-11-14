@@ -1,6 +1,6 @@
 
 srun --pty -w node-gpu01 --gres gpu:H100:1 /bin/bash
-srun --time 3-23 --mem=400G --cpus-per-gpu=4 --pty --gres gpu:H100:1 /bin/bash 
+srun --time 3-23 --mem=400G --cpus-per-gpu=4 --pty --gres gpu:H100:1 --reservation=ConfNov19 /bin/bash 
 srun --mem=500G --cpus-per-gpu=4 --reservation=ConfNov19 --pty /bin/bash 
 conda activate llm
 module load cudnn8.9-cuda12.3  cuda12.3/toolkit cuda12.3/fft cuda12.3/blas

@@ -6,6 +6,7 @@ from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, Dataset
 from torch_geometric.loader.dataloader import Collater
 from torch_geometric.data import Batch
+from VLSI_util.data import stage1dataset
 
 class TrainCollater:
     def __init__(self, tokenizer, text_max_len, mol_ph, graph_token_id, prompt):
@@ -20,7 +21,7 @@ class TrainCollater:
         graphs, texts = zip(*batch)
         graph_batch = Batch.from_data_list(graphs)     
         
-        self.tokenizer.paddding_side = 'left' # By setting the value to 'left', you're instructing the tokenizer to add padding tokens to the left side of a text sequence.
+        self.tokenizer.paddding_side = 'left' # Reason for left padding here: pad pad pad prompt: geration result pad pad pad
         prompt = [self.prompt.format(self.mol_ph)] * len(texts)
         prompt_tokens = self.tokenizer(text=prompt, 
                                               truncation=False,
@@ -80,7 +81,6 @@ class Stage2Netlist(LightningDataModule):
         mode: str = 'pretrain',
         num_workers: int = 0,
         batch_size: int = 256,
-        root: str = './VLSI_util/',
         text_max_len: int = 128,
         tokenizer=None,
         args=None,
@@ -93,10 +93,31 @@ class Stage2Netlist(LightningDataModule):
         self.num_workers = num_workers
         self.text_max_len = text_max_len
         self.prompt = args.prompt
-        self.data_set = torch.load(root + '/netlist.pt')
-        self.train_dataset = self.data_set
-        self.val_dataset = self.data_set
-        self.test_dataset = self.data_set
+        # self.data_set = torch.load(args.dataset_path + '/netlist.pt')
+        # self.train_dataset = self.data_set
+        # self.val_dataset = self.data_set
+        # self.test_dataset = self.data_set
+        # if mix datasets, we need to change the rtl_id
+        train_graphs = []
+        val_graphs = []
+        test_graphs = []
+        max_rtlid = 0
+        for ds_path in args.dataset_path:
+            ds = torch.load(ds_path)
+            this_train = torch.load(ds_path.replace('.pt', '_train.pt'))
+            this_val = torch.load(ds_path.replace('.pt', '_val.pt'))
+            this_test = torch.load(ds_path.replace('.pt', '_test.pt'))
+            train_graphs.extend(this_train)
+            val_graphs.extend(this_val)
+            test_graphs.extend(this_test)
+            max_rtlid += max(ds['rtl_id_list']) + 1
+            print(f"max_rtlid: {max_rtlid}")
+            del split_datasets
+        print(f"Use MIXED DATASETS! train: {len(train_graphs)}, val: {len(val_graphs)}, test: {len(test_graphs)}")
+        self.train_dataset = stage1dataset(train_graphs)
+        self.val_dataset = stage1dataset(val_graphs)
+        self.test_dataset = stage1dataset(test_graphs)
+
         self.init_tokenizer(tokenizer)
         self.graph_ph_token = '<graph>' * self.args.num_query_token # ph is short for placeholder
         
@@ -165,8 +186,8 @@ class Stage2Netlist(LightningDataModule):
         parser.add_argument('--batch_size', type=int, default=8)
         parser.add_argument('--inference_batch_size', type=int, default=8)
         parser.add_argument('--use_smiles', action='store_true', default=False)
-        parser.add_argument('--root', type=str, default='/scratch/scratch/weili3')
-        parser.add_argument('--text_max_len', type=int, default=256)
+        parser.add_argument("--dataset_path", action="extend", nargs="+", type=str, default=["/scratch/weili3/RTLCoder26532.pt","/scratch/weili3/MGVerilog11144.pt"])
+        parser.add_argument('--text_max_len', type=int, default=512)
         parser.add_argument('--prompt', type=str, default='The graph of this module is [START_NETLIST_GRAPH]{}[END__NETLIST_GRAPH].')
         return parent_parser
     

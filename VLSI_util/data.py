@@ -181,8 +181,18 @@ class netlistDataset(InMemoryDataset):
                 mapping_effort = syn_efforts.split('_')[1]
                 optimization_effort = syn_efforts.split('_')[2]
                 func_desc += ' The synthesis efforts are: generic_effort - ' + generic_effort + ', mapping_effort - ' + mapping_effort + ', optimization_effort - ' + optimization_effort + '.'
+            netlist_file_path = os.path.join(netlist_file_dir_path, str(netlist_file[key]['rtl_id']) + '_' + netlist_file[key]['synthesis_efforts'] + '.v')
+            # load netlist_file_path as a string
+            try:
+                with open(netlist_file_path, 'r') as f:
+                    netlist_str = f.read()
+            except:
+                error_files.append(netlist_file_path)
+                continue
             self.graphs[-1].text = func_desc
             self.graphs[-1].rtl_id = int(netlist_file[key]['rtl_id'])
+            self.graphs[-1].netlist = netlist_str
+            self.graphs[-1].rtl = rtl_file[str(netlist_file[key]['rtl_id'])]['verilog']
         print('error files: ', error_files)
 
     def len(self):
@@ -247,8 +257,20 @@ def create_datasets_v2(netlist_path, rtl_path, seed = 42, train_ratio = 0.9, eva
         mapping_effort = syn_efforts.split('_')[1]
         optimization_effort = syn_efforts.split('_')[2]
         func_desc += ' The synthesis efforts are: generic_effort - ' + generic_effort + ', mapping_effort - ' + mapping_effort + ', optimization_effort - ' + optimization_effort + '.'
+        netlist_file_path = os.path.join(netlist_file_dir_path, str(netlist_file[key]['rtl_id']) + '_' + netlist_file[key]['synthesis_efforts'] + '.v')
+        # load netlist_file_path as a string
+        try:
+            with open(netlist_file_path, 'r') as f:
+                netlist_str = f.read()
+        except:
+            error_files.append(netlist_file_path)
+            continue
         graphs[-1].text = func_desc
         graphs[-1].rtl_id = int(netlist_file[key]['rtl_id'])
+        graphs[-1].netlist = netlist_str[:2048]
+        graphs[-1].rtl = rtl_file[str(netlist_file[key]['rtl_id'])]['verilog'][:2048]
+        graphs[-1].name_mapping = rtl_file[str(netlist_file[key]['rtl_id'])]['name_mapping']
+        graphs[-1].consistent_label = rtl_file[str(netlist_file[key]['rtl_id'])]['consistent_label']
 
     print('error files: ', error_files)
     result = {}
