@@ -42,7 +42,7 @@ def main(args):
                                          save_top_k=-1))
     
     # logger = CSVLogger(save_dir=f'./all_checkpoints/{args.filename}/')
-    logger = WandbLogger(project='LLM-graph-stage10-textonly')
+    logger = WandbLogger(project=args.filename)
     trainer = Trainer(fast_dev_run = False,precision=args.precision, max_epochs=args.max_epochs, val_check_interval=0.5, callbacks=callbacks, logger = logger,strategy=DDPStrategy(find_unused_parameters=True, static_graph=True))
     if args.mode == 'train':
         trainer.fit(model, datamodule=dm)
@@ -56,7 +56,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--filename', type=str, default="stage1_text")
+    parser.add_argument('--filename', type=str, default="stage1_text_rtl_2048")
     # GPU
     parser.add_argument('--seed', type=int, default=42, help='random seed')
     # MM settings

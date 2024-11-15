@@ -13,12 +13,13 @@ class TrainCollater(object):
         self.text_max_len = text_max_len
     
     def __call__(self, batch):
-        data_list, text_list, netlist_list, rtl_list  = zip(*batch)
-        graph_batch = Batch.from_data_list(data_list)     
-        text_batch = self.tokenizer(text_list, padding='max_length', truncation=True, max_length=self.text_max_len, return_tensors='pt')
-        netlist_batch = self.tokenizer(netlist_list, padding='max_length', truncation=True, max_length=self.text_max_len, return_tensors='pt')
-        rtl_batch = self.tokenizer(rtl_list, padding='max_length', truncation=True, max_length=self.text_max_len, return_tensors='pt')
-        return graph_batch, text_batch.input_ids, text_batch.attention_mask, netlist_batch.input_ids, netlist_batch.attention_mask, rtl_batch.input_ids, rtl_batch.attention_mask
+        # data_list= zip(*batch)
+        graph_batch = Batch.from_data_list(batch)     
+        text_batch = self.tokenizer(graph_batch.text, padding='max_length', truncation=True, max_length=self.text_max_len, return_tensors='pt')
+        # netlist_batch = self.tokenizer(graph_batch.netlist, padding='max_length', truncation=True, max_length=self.text_max_len, return_tensors='pt')
+        rtl_batch = self.tokenizer(graph_batch.rtl, padding='max_length', truncation=True, max_length=self.text_max_len, return_tensors='pt')
+        return graph_batch, text_batch.input_ids, text_batch.attention_mask, rtl_batch.input_ids, rtl_batch.attention_mask, rtl_batch.input_ids, rtl_batch.attention_mask # use rtl to match the text instead
+        # return graph_batch, text_batch.input_ids, text_batch.attention_mask, netlist_batch.input_ids, netlist_batch.attention_mask, rtl_batch.input_ids, rtl_batch.attention_mask
 
 
 
@@ -172,6 +173,6 @@ class Stage1DM_v2(LightningDataModule):
         # mix: whether to mix the dataset, default is True
         import argparse
         parser.add_argument('--mix', default=True, action=argparse.BooleanOptionalAction)
-        parser.add_argument('--text_max_len', type=int, default=512)
+        parser.add_argument('--text_max_len', type=int, default=2048)
         return parent_parser
     

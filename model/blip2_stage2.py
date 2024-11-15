@@ -156,7 +156,10 @@ class Blip2Stage2(pl.LightningModule):
 
     def save_predictions(self, predictions, targets):
         assert len(predictions) == len(targets)
-        with open(os.path.join(self.logger.log_dir, 'predictions.txt'), 'w', encoding='utf8') as f:
+        # mkdir if args.file_names does not exist
+        if not os.path.exists("./predictions"):
+            os.mkdir("./predictions")
+        with open(os.path.join("./predictions", self.args.filename + '.txt'), 'w', encoding='utf8') as f:
             for p, t in zip(predictions, targets):
                 line = {'prediction': p, 'target': t}
                 f.write(json.dumps(line, ensure_ascii=True) + '\n')
@@ -306,7 +309,7 @@ class Blip2Stage2(pl.LightningModule):
         # optimization
         parser.add_argument('--reaction_weight', type=float, default=1.0, help = "deprecated in our project (for reaction)")
         parser.add_argument('--weight_decay', type=float, default=0.05, help='optimizer weight decay')
-        parser.add_argument('--init_lr', type=float, default=1e-4, help='optimizer init learning rate')
+        parser.add_argument('--init_lr', type=float, default=2e-4, help='optimizer init learning rate')
         parser.add_argument('--min_lr', type=float, default=1e-5, help='optimizer min learning rate')
         parser.add_argument('--warmup_lr', type=float, default=1e-6, help='optimizer warmup learning rate')
         parser.add_argument('--warmup_steps', type=int, default=1000, help='optimizer warmup steps')

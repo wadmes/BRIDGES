@@ -23,7 +23,7 @@ class stage1dataset(InMemoryDataset):
         return len(self.graphs)
 
     def __getitem__(self, index):
-        return self.graphs[index], self.graphs[index].text, self.graphs[index].netlist[:2000], self.graphs[index].rtl[:2000]
+        return self.graphs[index]
     
 
 

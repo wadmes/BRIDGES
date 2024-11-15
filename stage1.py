@@ -9,7 +9,7 @@ from pytorch_lightning.loggers import WandbLogger
 from model.blip2_stage1 import Blip2Stage1
 from VLSI_util.data_module import Stage1DM_v2
 from VLSI_util.data import netlistDataset
-
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
 ## for pyg bug
 warnings.filterwarnings('ignore', category=UserWarning, message='TypedStorage is deprecated')
@@ -40,6 +40,7 @@ def main(args):
                                          filename='{epoch:02d}', 
                                          every_n_epochs=args.save_every_n_epochs, 
                                          save_top_k=-1))
+    callbacks.append(EarlyStopping(monitor='val_fullset_t2g_rtlid_acc', mode = 'max', patience=3))
     
     # logger = CSVLogger(save_dir=f'./all_checkpoints/{args.filename}/')
     logger = WandbLogger(project='LLM-graph-stage1-v2-newdata')
@@ -65,7 +66,7 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str, default='train')
     parser.add_argument('--devices', type=str, default='0,1,2,3')
     parser.add_argument('--precision', type=str, default='bf16-mixed')
-    parser.add_argument('--max_epochs', type=int, default=10)
+    parser.add_argument('--max_epochs', type=int, default=11)
     parser.add_argument('--check_val_every_n_epoch', type=int, default=1)
     # parser.add_argument('--save_every_n_epochs', type=int, default=1)
     # parser = Trainer.add_argparse_args(parser)

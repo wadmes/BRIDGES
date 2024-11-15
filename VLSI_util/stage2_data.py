@@ -8,21 +8,29 @@ from torch_geometric.loader.dataloader import Collater
 from torch_geometric.data import Batch
 from VLSI_util.data import stage1dataset
 
+
+"""
+task: str, one of ['func_desc','type_pred']
+"""
 class TrainCollater:
-    def __init__(self, tokenizer, text_max_len, mol_ph, graph_token_id, prompt):
+    def __init__(self, tokenizer, text_max_len, mol_ph, graph_token_id, prompt, task):
         self.text_max_len = text_max_len
         self.tokenizer = tokenizer
         self.collater = Collater([], [])
         self.mol_ph = mol_ph
         self.graph_token_id = graph_token_id
         self.prompt = prompt
+        self.task = task
         
     def __call__(self, batch):
-        graphs, texts = zip(*batch)
+        graphs = batch
+        if self.task == 'func_desc':
+            # remove graph with empty consistent_label
+            graphs = [graph for graph in graphs if graph.consistent_label is not ""]
         graph_batch = Batch.from_data_list(graphs)     
         
         self.tokenizer.paddding_side = 'left' # Reason for left padding here: pad pad pad prompt: geration result pad pad pad
-        prompt = [self.prompt.format(self.mol_ph)] * len(texts)
+        prompt = [self.prompt.format(self.mol_ph)] * len(graphs)
         prompt_tokens = self.tokenizer(text=prompt, 
                                               truncation=False,
                                               padding='longest',
@@ -36,7 +44,13 @@ class TrainCollater:
         # print(smiles_prompt_tokens.input_ids, self.graph_token_id)
         # print(is_graph_token)
         self.tokenizer.paddding_side = 'right'
-        text_tokens = self.tokenizer(text=texts,
+        if self.task == 'func_desc':
+            text = graph_batch.text
+        elif self.task == 'type_pred':
+            text = graph_batch.consistent_label
+        else:
+            raise NotImplementedError
+        text_tokens = self.tokenizer(text=text,
                                      truncation=True,
                                      padding='longest',
                                      add_special_tokens=True,
@@ -48,19 +62,27 @@ class TrainCollater:
     
 
 class InferenceCollater:
-    def __init__(self, tokenizer, text_max_len, mol_ph, graph_token_id, prompt):
+    def __init__(self, tokenizer, text_max_len, mol_ph, graph_token_id, prompt, task):
         self.text_max_len = text_max_len
         self.tokenizer = tokenizer
         self.collater = Collater([], [])
         self.mol_ph = mol_ph
         self.graph_token_id = graph_token_id
         self.prompt = prompt
+        self.task = task
     def __call__(self, batch):
-        graphs, texts = zip(*batch)
+        graphs = batch
+        if self.task == 'func_desc':
+            # remove graph with empty consistent_label
+            graphs = [graph for graph in graphs if graph.consistent_label is not ""]
         graph_batch = Batch.from_data_list(graphs)   
         ## deal with prompt
         self.tokenizer.paddding_side = 'left' # By setting the value to 'left', you're instructing the tokenizer to add padding tokens to the left side of a text sequence.
-        prompt = [self.prompt.format(self.mol_ph)] * len(texts)
+        prompt = [self.prompt.format(self.mol_ph)] * len(graphs)
+        if self.task == 'func_desc':
+            text = graph_batch.text
+        elif self.task == 'type_pred':
+            text = graph_batch.consistent_label
         prompt_tokens = self.tokenizer(text=prompt, 
                                               truncation=False,
                                               padding='longest',
@@ -71,7 +93,7 @@ class InferenceCollater:
         # in smiles_handler, the token graph_ph_token (<graph>) is inserted
         is_graph_token = prompt_tokens.input_ids == self.graph_token_id # self.opt_tokenizer.graph_token_id = self.opt_tokenizer("<graph>", add_special_tokens=False).input_ids[0]
         prompt_tokens['is_graph_token'] = is_graph_token 
-        return graph_batch, prompt_tokens, texts
+        return graph_batch, prompt_tokens, text
     
 
 
@@ -142,7 +164,7 @@ class Stage2Netlist(LightningDataModule):
             pin_memory=False,
             drop_last=True,
             persistent_workers=True,
-            collate_fn=TrainCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt),
+            collate_fn=TrainCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt, self.args.task),
         )
         return loader
 
@@ -155,7 +177,7 @@ class Stage2Netlist(LightningDataModule):
             pin_memory=False,
             drop_last=False,
             persistent_workers=True,
-            collate_fn=TrainCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt),
+            collate_fn=TrainCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt, self.args.task),
         )
         test_loader = DataLoader(
             self.test_dataset,
@@ -165,7 +187,7 @@ class Stage2Netlist(LightningDataModule):
             pin_memory=False,
             drop_last=False,
             persistent_workers=True,
-            collate_fn=InferenceCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt),
+            collate_fn=InferenceCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt, self.args.task),
         )
         return [val_loader, test_loader]
     
@@ -178,7 +200,7 @@ class Stage2Netlist(LightningDataModule):
             pin_memory=False,
             drop_last=False,
             persistent_workers=True,
-            collate_fn=InferenceCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt),
+            collate_fn=InferenceCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt, self.args.task),
         )
         return loader
 
@@ -187,9 +209,10 @@ class Stage2Netlist(LightningDataModule):
         parser.add_argument('--num_workers', type=int, default=4)
         parser.add_argument('--batch_size', type=int, default=8)
         parser.add_argument('--inference_batch_size', type=int, default=8)
-        parser.add_argument('--use_smiles', action='store_true', default=False)
         parser.add_argument("--dataset_path", action="extend", nargs="+", type=str, default=["/scratch/weili3/RTLCoder26532.pt","/scratch/weili3/MGVerilog11144.pt"])
         parser.add_argument('--text_max_len', type=int, default=512)
         parser.add_argument('--prompt', type=str, default='The graph of this module is [START_NETLIST_GRAPH]{}[END__NETLIST_GRAPH].')
+        # task, default is 'type_pred'
+        parser.add_argument('--task', type=str, default='type_pred', help='one of [func_desc, type_pred]')
         return parent_parser
     

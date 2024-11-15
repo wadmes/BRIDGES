@@ -216,10 +216,9 @@ class stage1dataset(InMemoryDataset):
         return len(self.graphs)
 
     def __getitem__(self, index):
-        self.graphs[index]['node','pos','node'].edge_index = self.graphs[index]['node','pos','node'].edge_index.long()
-        self.graphs[index]['node','inv','node'].edge_index = self.graphs[index]['node','inv','node'].edge_index.long()
-        return self.graphs[index], self.graphs[index].text
-    
+        # self.graphs[index]['node','pos','node'].edge_index = self.graphs[index]['node','pos','node'].edge_index.long()
+        # self.graphs[index]['node','inv','node'].edge_index = self.graphs[index]['node','inv','node'].edge_index.long()
+        return self.graphs[index]
 
 
 """

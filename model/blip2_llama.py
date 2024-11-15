@@ -262,41 +262,40 @@ class Blip2Llama(Blip2Base):
         graphs = samples['graphs']
         prompt_tokens = samples['prompt_tokens']
         # prompt_lens = samples['prompt_lens']
-        with self.maybe_autocast():
-            graph_embeds, graph_masks = self.graph_encoder(graphs)
-            graph_embeds = self.ln_graph(graph_embeds)
+        graph_embeds, graph_masks = self.graph_encoder(graphs)
+        graph_embeds = self.ln_graph(graph_embeds)
 
-            query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
-            query_output = self.Qformer.bert(
-                query_embeds=query_tokens,
-                encoder_hidden_states=graph_embeds,
-                
-                return_dict=True,
-            )
+        query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
+        query_output = self.Qformer.bert(
+            query_embeds=query_tokens,
+            encoder_hidden_states=graph_embeds,
+            
+            return_dict=True,
+        )
 
-            device = graph_embeds.device
-            graph_tokens = self.llm_proj(query_output.last_hidden_state)
-            prompt_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
-            prompt_embeds[prompt_tokens.is_graph_token] = graph_tokens.flatten(0, 1)
+        device = graph_embeds.device
+        graph_tokens = self.llm_proj(query_output.last_hidden_state)
+        prompt_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
+        prompt_embeds[prompt_tokens.is_graph_token] = graph_tokens.flatten(0, 1)
 
-            outputs = self.llm_model.generate(
-                inputs_embeds=prompt_embeds,
-                attention_mask=prompt_tokens.attention_mask,
-                do_sample=do_sample,
-                top_p=top_p,
-                temperature=temperature,
-                num_beams=num_beams,
-                max_length=max_length,
-                min_length=min_length,
-                pad_token_id=self.pad_token_id,
-                eos_token_id=self.eos_token_id,
-                repetition_penalty=repetition_penalty,
-                length_penalty=length_penalty,
-                num_return_sequences=num_captions,
-                # use_cache=False,
-            )
-            # outputs[outputs == 0] = 2 # convert output id 0 to 2 (eos_token_id)
-            output_text = self.llm_tokenizer.batch_decode(outputs, skip_special_tokens=True)
-            output_text = [text.strip() for text in output_text]
-            return output_text
+        outputs = self.llm_model.generate(
+            inputs_embeds=prompt_embeds,
+            attention_mask=prompt_tokens.attention_mask,
+            do_sample=do_sample,
+            top_p=top_p,
+            temperature=temperature,
+            num_beams=num_beams,
+            max_length=max_length,
+            min_length=min_length,
+            pad_token_id=self.pad_token_id,
+            eos_token_id=self.eos_token_id,
+            repetition_penalty=repetition_penalty,
+            length_penalty=length_penalty,
+            num_return_sequences=num_captions,
+            # use_cache=False,
+        )
+        # outputs[outputs == 0] = 2 # convert output id 0 to 2 (eos_token_id)
+        output_text = self.llm_tokenizer.batch_decode(outputs, skip_special_tokens=True)
+        output_text = [text.strip() for text in output_text]
+        return output_text
         
