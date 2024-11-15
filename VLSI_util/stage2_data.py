@@ -13,11 +13,11 @@ from VLSI_util.data import stage1dataset
 task: str, one of ['func_desc','type_pred']
 """
 class TrainCollater:
-    def __init__(self, tokenizer, text_max_len, mol_ph, graph_token_id, prompt, task):
+    def __init__(self, tokenizer, text_max_len, graph_ph, graph_token_id, prompt, task):
         self.text_max_len = text_max_len
         self.tokenizer = tokenizer
         self.collater = Collater([], [])
-        self.mol_ph = mol_ph
+        self.graph_ph = graph_ph
         self.graph_token_id = graph_token_id
         self.prompt = prompt
         self.task = task
@@ -30,9 +30,9 @@ class TrainCollater:
         graph_batch = Batch.from_data_list(graphs)     
         
         self.tokenizer.paddding_side = 'left' # Reason for left padding here: pad pad pad prompt: geration result pad pad pad
-        prompt = [self.prompt.format(self.mol_ph)] * len(graphs)
+        prompt = [self.prompt.format(self.graph_ph)] * len(graphs)
         prompt_tokens = self.tokenizer(text=prompt, 
-                                              truncation=False,
+                                              truncation=True,
                                               padding='longest',
                                               add_special_tokens=True,
                                               return_tensors='pt',
@@ -50,6 +50,10 @@ class TrainCollater:
             text = graph_batch.consistent_label
         else:
             raise NotImplementedError
+        
+        # add tokenizer.eos_token to each end of text
+        text = [f"{t}{self.tokenizer.eos_token}" for t in text]
+
         text_tokens = self.tokenizer(text=text,
                                      truncation=True,
                                      padding='longest',
@@ -62,11 +66,11 @@ class TrainCollater:
     
 
 class InferenceCollater:
-    def __init__(self, tokenizer, text_max_len, mol_ph, graph_token_id, prompt, task):
+    def __init__(self, tokenizer, text_max_len, graph_ph, graph_token_id, prompt, task):
         self.text_max_len = text_max_len
         self.tokenizer = tokenizer
         self.collater = Collater([], [])
-        self.mol_ph = mol_ph
+        self.graph_ph = graph_ph
         self.graph_token_id = graph_token_id
         self.prompt = prompt
         self.task = task
@@ -78,7 +82,7 @@ class InferenceCollater:
         graph_batch = Batch.from_data_list(graphs)   
         ## deal with prompt
         self.tokenizer.paddding_side = 'left' # By setting the value to 'left', you're instructing the tokenizer to add padding tokens to the left side of a text sequence.
-        prompt = [self.prompt.format(self.mol_ph)] * len(graphs)
+        prompt = [self.prompt.format(self.graph_ph)] * len(graphs)
         if self.task == 'func_desc':
             text = graph_batch.text
         elif self.task == 'type_pred':
@@ -210,7 +214,7 @@ class Stage2Netlist(LightningDataModule):
         parser.add_argument('--batch_size', type=int, default=8)
         parser.add_argument('--inference_batch_size', type=int, default=8)
         parser.add_argument("--dataset_path", action="extend", nargs="+", type=str, default=["/scratch/weili3/RTLCoder26532.pt","/scratch/weili3/MGVerilog11144.pt"])
-        parser.add_argument('--text_max_len', type=int, default=512)
+        parser.add_argument('--text_max_len', type=int, default=256)
         parser.add_argument('--prompt', type=str, default='The graph of this module is [START_NETLIST_GRAPH]{}[END__NETLIST_GRAPH].')
         # task, default is 'type_pred'
         parser.add_argument('--task', type=str, default='type_pred', help='one of [func_desc, type_pred]')

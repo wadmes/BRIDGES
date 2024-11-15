@@ -85,7 +85,7 @@ class Blip2Llama(Blip2Base):
 
         ## initialize opt model
         
-        self.llm_tokenizer = AutoTokenizer.from_pretrained(llm_model, use_fast=False)
+        self.llm_tokenizer = AutoTokenizer.from_pretrained(llm_model, use_fast=False, add_eos_token = True)
         self.llm_tokenizer.add_special_tokens({'pad_token': '[PAD]'})
         self.llm_tokenizer.add_special_tokens({'additional_special_tokens': ['[START_NETLIST_GRAPH]','[END_NETLIST_GRAPH]', '<graph>']})
 
@@ -137,9 +137,7 @@ class Blip2Llama(Blip2Base):
         graph_tokens = self.llm_proj(query_output.last_hidden_state)
         
         empty_targets = torch.ones(prompt_tokens.attention_mask.shape, dtype=torch.long).to(device).fill_(-100)
-        targets = text_tokens.input_ids.masked_fill(
-            text_tokens.input_ids == self.llm_tokenizer.pad_token_id, -100
-        )
+        targets = text_tokens.input_ids.masked_fill(text_tokens.input_ids == self.llm_tokenizer.pad_token_id, -100)
         targets = torch.cat([empty_targets, targets], dim=1)
 
         prompt_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)

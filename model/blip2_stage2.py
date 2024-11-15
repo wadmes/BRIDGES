@@ -12,7 +12,7 @@ import torch.distributed as dist
 from peft import LoraConfig, TaskType
 from model.help_funcs import caption_evaluate, AttrDict
 from transformers import Adafactor
-
+import timeit
 
 def load_ignore_unexpected(model, state_dict):
     keys = set(model.state_dict().keys())
@@ -181,15 +181,18 @@ class Blip2Stage2(pl.LightningModule):
     @torch.no_grad()
     def validation_step(self, batch, batch_idx, dataloader_idx):
         if dataloader_idx == 0:
+            start_time = timeit.default_timer()
             _, _, text_tokens = batch
             batch_size = text_tokens.input_ids.shape[0]
             loss = self.blip2opt(batch)
+            print(f"batch_size: {batch_size}, time: {timeit.default_timer() - start_time}")
             ###============== Overall Loss ===================###
             self.log("val molecule loss", float(loss['loss']), batch_size=batch_size, sync_dist=True)
             return loss['loss']
         elif dataloader_idx == 1:
             if (self.current_epoch+1) % self.caption_eval_epoch != 0:
                 return 
+            start_time = timeit.default_timer()
             graphs, prompt_tokens, texts = batch
             ###============== Captioning Results ===================###
             samples = {'graphs': graphs, 'prompt_tokens': prompt_tokens}
@@ -202,13 +205,7 @@ class Blip2Stage2(pl.LightningModule):
             )
             self.list_predictions.append(predictions)
             self.list_targets.append(texts)
-        elif dataloader_idx == 2:
-            reaction_tokens, _, _ = batch
-            batch_size = reaction_tokens.input_ids.shape[0]
-            loss = self.blip2opt.forward_reaction(batch)
-            ###============== Overall Loss ===================###
-            self.log("val reaction loss", float(loss['loss']), batch_size=batch_size, sync_dist=True)
-            return loss['loss']
+            print(f"caption time: {timeit.default_timer() - start_time}")
         else:
             raise NotImplementedError
     
@@ -294,7 +291,7 @@ class Blip2Stage2(pl.LightningModule):
         parser.add_argument('--num_beams', type=int, default=5)
         parser.add_argument('--do_sample', action='store_true', default=False)
         parser.add_argument('--max_len', type=int, default=256, help = "used in generation")
-        parser.add_argument('--min_len', type=int, default=8)
+        parser.add_argument('--min_len', type=int, default=2)
         parser.add_argument('--llm_tune', type=str, default='lora')
         parser.add_argument('--peft_config', type=str, default=None)
         parser.add_argument('--peft_dir', type=str, default='')
