@@ -169,7 +169,7 @@ class Blip2Stage1(pl.LightningModule):
         parser.add_argument('--num_query_token', type=int, default=8)
         # optimization
         parser.add_argument('--weight_decay', type=float, default=0.05, help='optimizer weight decay')
-        parser.add_argument('--init_lr', type=float, default=3e-4, help='optimizer init learning rate')
+        parser.add_argument('--init_lr', type=float, default=1e-4, help='optimizer init learning rate')
         parser.add_argument('--min_lr', type=float, default=1e-5, help='optimizer min learning rate')
         parser.add_argument('--warmup_lr', type=float, default=1e-6, help='optimizer warmup learning rate')
         parser.add_argument('--warmup_steps', type=int, default=1000, help='optimizer warmup steps')

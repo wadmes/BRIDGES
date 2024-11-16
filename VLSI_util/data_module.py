@@ -16,7 +16,7 @@ class TrainCollater(object):
     def __call__(self, batch):
         # print("data_list", data_list)
         graph_batch = Batch.from_data_list(batch)        
-        text_batch = self.tokenizer(graph_batch.text, padding='longest', truncation=True, return_tensors='pt')
+        text_batch = self.tokenizer(graph_batch.text, padding='max_length', truncation=True, max_length=self.text_max_len, return_tensors='pt')
         return graph_batch, text_batch.input_ids, text_batch.attention_mask
 
 
