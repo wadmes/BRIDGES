@@ -14,10 +14,9 @@ class TrainCollater(object):
         self.text_max_len = text_max_len
     
     def __call__(self, batch):
-        data_list, text_list = zip(*batch)
         # print("data_list", data_list)
-        graph_batch = Batch.from_data_list(data_list)        
-        text_batch = self.tokenizer(text_list, padding='max_length', truncation=True, max_length=self.text_max_len, return_tensors='pt')
+        graph_batch = Batch.from_data_list(batch)        
+        text_batch = self.tokenizer(graph_batch.text, padding='longest', truncation=True, return_tensors='pt')
         return graph_batch, text_batch.input_ids, text_batch.attention_mask
 
 
@@ -118,8 +117,10 @@ class Stage1DM_v2(LightningDataModule):
                 test_graphs.extend(this_test)
                 max_rtlid += max(ds['rtl_id_list']) + 1
                 print(f"max_rtlid: {max_rtlid}")
-                del split_datasets
+            # only use args.training_data_used of the training data
+            train_graphs = train_graphs[:int(len(train_graphs)*args.training_data_used)]
             print(f"Use MIXED DATASETS! train: {len(train_graphs)}, val: {len(val_graphs)}, test: {len(test_graphs)}")
+
             self.train_dataset = stage1dataset(train_graphs)
             self.val_dataset = stage1dataset(val_graphs)
             self.test_dataset = stage1dataset(test_graphs)
@@ -150,5 +151,6 @@ class Stage1DM_v2(LightningDataModule):
         import argparse
         parser.add_argument('--mix', default=True, action=argparse.BooleanOptionalAction)
         parser.add_argument('--text_max_len', type=int, default=256)
+        parser.add_argument('--training_data_used', type=float, default=1.0, help='percentage of training data used')
         return parent_parser
     

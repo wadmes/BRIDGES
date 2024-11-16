@@ -300,7 +300,7 @@ class Blip2Llama(Blip2Base):
         return output_text
     
     @torch.no_grad()
-    def generate_with_candidates(
+    def generate_from_candidates(
         self,
         samples,
         candidate_tokens,
@@ -347,17 +347,20 @@ class Blip2Llama(Blip2Base):
         # Expand prompts to match candidates
         expanded_prompt_input_embeds = prompt_embeds.unsqueeze(1).expand(num_prompts, num_candidates, prompt_len,hidden_dimenstion)
         expanded_prompt_attention_mask = prompt_attention_mask.unsqueeze(1).expand(num_prompts, num_candidates, prompt_len)
-
+        expanded_prompt_input_ids = prompt_tokens.input_ids.unsqueeze(1).expand(num_prompts, num_candidates, prompt_len)
+    
         # Expand candidates to match prompts
-        expanded_candidate_input_embeds = candidate_embeds.unsqueeze(0).expand(num_prompts, num_candidates, candidate_len)
-        expanded_candidate_attention_mask = candidate_attention_mask.unsqueeze(0).expand(num_prompts, num_candidates, candidate_len,hidden_dimenstion)
+        expanded_candidate_input_ids = candidate_input_ids.unsqueeze(0).expand(num_prompts, num_candidates, candidate_len)
+        expanded_candidate_input_embeds = candidate_embeds.unsqueeze(0).expand(num_prompts, num_candidates, candidate_len,hidden_dimenstion)
+        expanded_candidate_attention_mask = candidate_attention_mask.unsqueeze(0).expand(num_prompts, num_candidates, candidate_len)
 
         # Concatenate prompts and candidates
-        concatenated_input_ids = torch.cat([expanded_prompt_input_embeds, concatenated_input_ids], dim=-2) # Shape: (N, K, seq_len + response_len, D)
+        concatenated_input_embeds = torch.cat([expanded_prompt_input_embeds, expanded_candidate_input_embeds], dim=-2) # Shape: (N, K, seq_len + response_len, D)
         concatenated_attention_mask = torch.cat([expanded_prompt_attention_mask, expanded_candidate_attention_mask], dim=-1)
 
         # Flatten for batch processing
-        concatenated_input_ids = concatenated_input_ids.view(-1, concatenated_input_ids.size(-1))  # Shape: (N*K, seq_len + response_len)
+        concatenated_input_ids = torch.cat([expanded_prompt_input_ids, expanded_candidate_input_ids], dim=-1)
+        concatenated_input_embeds = concatenated_input_embeds.view(-1, concatenated_input_embeds.size(-2), concatenated_input_embeds.size(-1))  # Shape: (N*K, seq_len + response_len, D)
         concatenated_attention_mask = concatenated_attention_mask.view(-1, concatenated_attention_mask.size(-1))  # Shape: (N*K, seq_len + response_len)
 
         # Prepare labels (same as input_ids, but pad tokens are ignored)

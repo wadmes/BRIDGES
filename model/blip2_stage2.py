@@ -72,7 +72,8 @@ class Blip2Stage2(pl.LightningModule):
         
         if self.args.task == 'type_pred':
             self.candidates = ['Encryption Unit', 'Data Path Unit', 'Control Logic Unit', 'Arithmetic Unit', 'Communication Protocol Unit', 'Signal Processing Unit', 'Clock Management Unit', 'Others']
-            self.candidate_tokens = self.blip2opt.llm_tokenizer(self.candidates,truncation=True, padding='longest', return_tensors='pt', return_attention_mask=True,add_special_tokens=False)
+            self.candidate_tokens = self.blip2opt.llm_tokenizer(self.candidates,truncation=True, padding='longest', return_tensors='pt', return_attention_mask=True,add_special_tokens=False).to("cuda")
+    
 
     def load_from_stage1_checkpoint(self, path):
         ckpt = torch.load(path, map_location='cpu')

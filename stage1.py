@@ -43,8 +43,8 @@ def main(args):
     callbacks.append(EarlyStopping(monitor='val_fullset_t2g_rtlid_acc', mode = 'max', patience=3))
     
     # logger = CSVLogger(save_dir=f'./all_checkpoints/{args.filename}/')
-    logger = WandbLogger(project='LLM-graph-stage1-v2-newdata')
-    trainer = Trainer(fast_dev_run = False,precision=args.precision, max_epochs=args.max_epochs, val_check_interval=0.5, callbacks=callbacks, logger = logger)
+    logger = WandbLogger(project='LLM-graph-stage1-v3-1115', name = args.filename)
+    trainer = Trainer(fast_dev_run = False,precision=args.precision, max_epochs=args.max_epochs, val_check_interval=args.val_check_interval, callbacks=callbacks, logger = logger)
     if args.mode == 'train':
         trainer.fit(model, datamodule=dm)
     elif args.mode == 'eval':
@@ -67,7 +67,7 @@ if __name__ == '__main__':
     parser.add_argument('--devices', type=str, default='0,1,2,3')
     parser.add_argument('--precision', type=str, default='bf16-mixed')
     parser.add_argument('--max_epochs', type=int, default=11)
-    parser.add_argument('--check_val_every_n_epoch', type=int, default=1)
+    parser.add_argument('--val_check_interval', type=float, default=1.0)
     # parser.add_argument('--save_every_n_epochs', type=int, default=1)
     # parser = Trainer.add_argparse_args(parser)
     parser = Blip2Stage1.add_model_specific_args(parser)  # add model args
@@ -76,7 +76,7 @@ if __name__ == '__main__':
     #                     devices='0,1,2,3',
     #                     precision='bf16',
     #                     max_epochs=50,
-    #                     check_val_every_n_epoch=1)
+    #                     val_check_interval=1)
     args = parser.parse_args()
     
     print("=========================================")
