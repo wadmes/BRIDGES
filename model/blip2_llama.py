@@ -357,17 +357,22 @@ class Blip2Llama(Blip2Base):
         # Concatenate prompts and candidates
         concatenated_input_embeds = torch.cat([expanded_prompt_input_embeds, expanded_candidate_input_embeds], dim=-2) # Shape: (N, K, seq_len + response_len, D)
         concatenated_attention_mask = torch.cat([expanded_prompt_attention_mask, expanded_candidate_attention_mask], dim=-1)
+        concatenated_input_ids = torch.cat([expanded_prompt_input_ids, expanded_candidate_input_ids], dim=-1) 
 
         # Flatten for batch processing
-        concatenated_input_ids = torch.cat([expanded_prompt_input_ids, expanded_candidate_input_ids], dim=-1)
+        concatenated_input_ids = concatenated_input_ids.view(-1, concatenated_input_ids.size(-1))  # Shape: (N*K, seq_len + response_len)
         concatenated_input_embeds = concatenated_input_embeds.view(-1, concatenated_input_embeds.size(-2), concatenated_input_embeds.size(-1))  # Shape: (N*K, seq_len + response_len, D)
         concatenated_attention_mask = concatenated_attention_mask.view(-1, concatenated_attention_mask.size(-1))  # Shape: (N*K, seq_len + response_len)
 
         # Prepare labels (same as input_ids, but pad tokens are ignored)
         labels = concatenated_input_ids.clone()
         labels[concatenated_attention_mask == 0] = -100  # Ignore padding tokens in loss calculation
+        # print(labels)
+        # print(labels.shape)
         with torch.no_grad():
-            outputs = self.llm_model(inputs_embeds=prompt_embeds,attention_mask=concatenated_attention_mask)
+            # print("prompt_embeds.shape",prompt_embeds.shape)
+            # print("concatenated_attention_mask.shape",concatenated_attention_mask.shape)
+            outputs = self.llm_model(inputs_embeds=concatenated_input_embeds,attention_mask=concatenated_attention_mask)
             logits = outputs.logits  # Shape: (N*K, seq_len + response_len, vocab_size)
 
         # Compute element-wise cross-entropy loss

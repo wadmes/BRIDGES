@@ -71,7 +71,7 @@ class Blip2Stage2(pl.LightningModule):
         self.save_hyperparameters(args)
         
         if self.args.task == 'type_pred':
-            self.candidates = ['Encryption Unit', 'Data Path Unit', 'Control Logic Unit', 'Arithmetic Unit', 'Communication Protocol Unit', 'Signal Processing Unit', 'Clock Management Unit', 'Others']
+            self.candidates = ['Encryption Unit<|end_of_text|>', 'Data Path Unit<|end_of_text|>', 'Control Logic Unit<|end_of_text|>', 'Arithmetic Unit<|end_of_text|>', 'Communication Protocol Unit<|end_of_text|>', 'Signal Processing Unit<|end_of_text|>', 'Clock Management Unit<|end_of_text|>', 'Others<|end_of_text|>']
             self.candidate_tokens = self.blip2opt.llm_tokenizer(self.candidates,truncation=True, padding='longest', return_tensors='pt', return_attention_mask=True,add_special_tokens=False).to("cuda")
     
 
@@ -135,14 +135,15 @@ class Blip2Stage2(pl.LightningModule):
             all_targets = [i for ii in all_targets for i in ii]
             self.save_predictions(all_predictions, all_targets, str(self.current_epoch) + '_test_')
             ## fixme: I am not sure if the max length is the same as previous experiments
-            bleu2, bleu4, rouge_1, rouge_2, rouge_l, meteor_score = \
-                caption_evaluate(all_predictions, all_targets, self.blip2opt.llm_tokenizer, self.max_len * 2) 
-            self.log("bleu2", bleu2, sync_dist=False)
-            self.log("bleu4", bleu4, sync_dist=False)
-            self.log("rouge_1", rouge_1, sync_dist=False)
-            self.log("rouge_2", rouge_2, sync_dist=False)
-            self.log("rouge_l", rouge_l, sync_dist=False)
-            self.log("meteor_score", meteor_score, sync_dist=False)
+            if self.args.task == 'func_desc':
+                bleu2, bleu4, rouge_1, rouge_2, rouge_l, meteor_score = \
+                    caption_evaluate(all_predictions, all_targets, self.blip2opt.llm_tokenizer, self.max_len * 2) 
+                self.log("bleu2", bleu2, sync_dist=False)
+                self.log("bleu4", bleu4, sync_dist=False)
+                self.log("rouge_1", rouge_1, sync_dist=False)
+                self.log("rouge_2", rouge_2, sync_dist=False)
+                self.log("rouge_l", rouge_l, sync_dist=False)
+                self.log("meteor_score", meteor_score, sync_dist=False)
 
     def save_predictions(self, predictions, targets,name):
         assert len(predictions) == len(targets)
@@ -214,7 +215,7 @@ class Blip2Stage2(pl.LightningModule):
             )
         self.list_predictions.append(predictions)
         self.list_targets.append(texts)
-        print(f"caption time: {timeit.default_timer() - start_time}")
+        # print(f"caption time: {timeit.default_timer() - start_time}")
     
     def on_validation_epoch_start(self) -> None:
         self.list_predictions = []
@@ -245,14 +246,15 @@ class Blip2Stage2(pl.LightningModule):
             all_targets = [i for ii in all_targets for i in ii]
             self.save_predictions(all_predictions, all_targets, str(self.current_epoch) + '_val_')
             ## fixme: I am not sure if the max length is the same as previous experiments
-            bleu2, bleu4, rouge_1, rouge_2, rouge_l, meteor_score = \
-                caption_evaluate(all_predictions, all_targets, self.blip2opt.llm_tokenizer, self.max_len * 2) 
-            self.log("bleu2", bleu2, sync_dist=False)
-            self.log("bleu4", bleu4, sync_dist=False)
-            self.log("rouge_1", rouge_1, sync_dist=False)
-            self.log("rouge_2", rouge_2, sync_dist=False)
-            self.log("rouge_l", rouge_l, sync_dist=False)
-            self.log("meteor_score", meteor_score, sync_dist=False)
+            if self.args.task == 'func_desc':
+                bleu2, bleu4, rouge_1, rouge_2, rouge_l, meteor_score = \
+                    caption_evaluate(all_predictions, all_targets, self.blip2opt.llm_tokenizer, self.max_len * 2) 
+                self.log("bleu2", bleu2, sync_dist=False)
+                self.log("bleu4", bleu4, sync_dist=False)
+                self.log("rouge_1", rouge_1, sync_dist=False)
+                self.log("rouge_2", rouge_2, sync_dist=False)
+                self.log("rouge_l", rouge_l, sync_dist=False)
+                self.log("meteor_score", meteor_score, sync_dist=False)
         
 
     def training_step(self, batch, batch_idx):

@@ -67,7 +67,7 @@ def main(args):
                                          save_top_k=-1,
                                          save_on_train_epoch_end=True))
     logger = WandbLogger(project='stage-2', dir='./wandb-log', name = args.filename)
-    trainer = Trainer(fast_dev_run = True,precision=args.precision, max_epochs=args.max_epochs, val_check_interval=args.val_check_interval, callbacks=callbacks, logger=logger, strategy=DDPStrategy(find_unused_parameters=True, static_graph=True))
+    trainer = Trainer(fast_dev_run = False,precision=args.precision, max_epochs=args.max_epochs, val_check_interval=args.val_check_interval, callbacks=callbacks, logger=logger, strategy=DDPStrategy(find_unused_parameters=True, static_graph=True))
     if args.mode in {'pretrain', 'ft'}:
         trainer.fit(model, datamodule=dm, ckpt_path=args.ckpt_path)
     elif args.mode == 'eval':

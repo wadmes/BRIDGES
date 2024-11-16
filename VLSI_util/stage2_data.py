@@ -25,12 +25,7 @@ class TrainCollater:
         
     def __call__(self, batch):
         graphs = batch
-        
-        if self.task == 'type_pred':
-            # print(f"len(graphs): {len(graphs)}")
-            # remove graph with empty consistent_label
-            graphs = [graph for graph in graphs if len(graph.consistent_label) > 0]
-            # print(f"after remove, len(graphs): {len(graphs)}")
+    
         graph_batch = Batch.from_data_list(graphs)     
         
         self.tokenizer.paddding_side = 'left' # Reason for left padding here: pad pad pad prompt: geration result pad pad pad
@@ -130,18 +125,25 @@ Please analyze the following Verilog graph and classify it into one of the speci
         test_graphs = []
         max_rtlid = 0
         for ds_path in args.dataset_path:
-            ds = torch.load(ds_path)
+            
             this_train = torch.load(ds_path.replace('.pt', '_train.pt'))
             this_val = torch.load(ds_path.replace('.pt', '_val.pt'))
             this_test = torch.load(ds_path.replace('.pt', '_test.pt'))
+            if args.task == 'type_pred':
+                # remove graph with empty consistent_label
+                for graphs in [this_train, this_val, this_test]:
+                    graphs = [graph for graph in graphs if len(graph.consistent_label) > 0]
             for split_dataset in [this_train, this_val, this_test]:
                 for graph in split_dataset:
                     graph.rtl_id += max_rtlid
+
             train_graphs.extend(this_train)
             val_graphs.extend(this_val)
             test_graphs.extend(this_test)
-            max_rtlid += max(ds['rtl_id_list']) + 1
-            print(f"max_rtlid: {max_rtlid}")
+            # 1116 update: here we comment out updating max-rtlid, for speedup, but note that rtlid then will be not matched!!!
+            # ds = torch.load(ds_path)
+            # max_rtlid += max(ds['rtl_id_list']) + 1
+            # print(f"max_rtlid: {max_rtlid}")
         print(f"Use MIXED DATASETS! train: {len(train_graphs)}, val: {len(val_graphs)}, test: {len(test_graphs)}")
         self.train_dataset = stage1dataset(train_graphs)
         self.val_dataset = stage1dataset(val_graphs)
