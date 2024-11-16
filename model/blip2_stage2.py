@@ -21,21 +21,6 @@ def load_ignore_unexpected(model, state_dict):
     ## try to print keys that are not included
     model.load_state_dict(state_dict, strict=True)
 
-
-# def load_ignore_mismatch(model, state_dict):
-#     keys = set(model.state_dict().keys())
-#     extra_keys = set()
-#     for key in state_dict:
-#         if key not in keys:
-#             extra_keys.add(key)
-#     missing_keys = set()
-#     for key in keys:
-#         if key not in state_dict:
-#             missing_keys.add(key)
-#     ## try to print keys that are not included
-#     model.load_state_dict(state_dict, strict=False)
-    
-
 def get_module_state_dict(state_dict, module_name):
     module_state_dict = {}
     for key, value in state_dict.items():
@@ -84,6 +69,10 @@ class Blip2Stage2(pl.LightningModule):
             raise NotImplementedError()
         self.tokenizer = self.blip2opt.init_tokenizer()
         self.save_hyperparameters(args)
+        
+        if self.args.task == 'type_pred':
+            self.candidates = ['Encryption Unit', 'Data Path Unit', 'Control Logic Unit', 'Arithmetic Unit', 'Communication Protocol Unit', 'Signal Processing Unit', 'Clock Management Unit', 'Others']
+            self.candidate_tokens = self.blip2opt.llm_tokenizer(self.candidates,truncation=True, padding='longest', return_tensors='pt', return_attention_mask=True,add_special_tokens=False)
 
     def load_from_stage1_checkpoint(self, path):
         ckpt = torch.load(path, map_location='cpu')
@@ -143,10 +132,10 @@ class Blip2Stage2(pl.LightningModule):
         if self.global_rank == 0:
             all_predictions = [i for ii in all_predictions for i in ii]
             all_targets = [i for ii in all_targets for i in ii]
-            self.save_predictions(all_predictions, all_targets)
+            self.save_predictions(all_predictions, all_targets, str(self.current_epoch) + '_test_')
             ## fixme: I am not sure if the max length is the same as previous experiments
             bleu2, bleu4, rouge_1, rouge_2, rouge_l, meteor_score = \
-                caption_evaluate(all_predictions, all_targets, self.tokenizer, self.max_len * 2) 
+                caption_evaluate(all_predictions, all_targets, self.blip2opt.llm_tokenizer, self.max_len * 2) 
             self.log("bleu2", bleu2, sync_dist=False)
             self.log("bleu4", bleu4, sync_dist=False)
             self.log("rouge_1", rouge_1, sync_dist=False)
@@ -154,48 +143,29 @@ class Blip2Stage2(pl.LightningModule):
             self.log("rouge_l", rouge_l, sync_dist=False)
             self.log("meteor_score", meteor_score, sync_dist=False)
 
-    def save_predictions(self, predictions, targets):
+    def save_predictions(self, predictions, targets,name):
         assert len(predictions) == len(targets)
         # mkdir if args.file_names does not exist
         if not os.path.exists("./predictions"):
             os.mkdir("./predictions")
-        with open(os.path.join("./predictions", self.args.filename + '.txt'), 'w', encoding='utf8') as f:
+        with open(os.path.join("./predictions", name + '_' + self.args.filename + '.txt'), 'w', encoding='utf8') as f:
             for p, t in zip(predictions, targets):
                 line = {'prediction': p, 'target': t}
                 f.write(json.dumps(line, ensure_ascii=True) + '\n')
 
     @torch.no_grad()
     def test_step(self, batch, batch_idx):
-        graphs, prompt_tokens, texts = batch
+        graphs, prompt_tokens, text_tokens, texts = batch
+        batch_size = text_tokens.input_ids.shape[0]
+        loss = self.blip2opt(batch)
+        # print(f"batch_size: {batch_size}, time: {timeit.default_timer() - start_time}")
+        ###============== Overall Loss ===================###
+        self.log("test graph loss (perplexity)", float(loss['loss']), batch_size=batch_size, sync_dist=True)
         ###============== Captioning Results ===================###
+        
         samples = {'graphs': graphs, 'prompt_tokens': prompt_tokens}
-        predictions = self.blip2opt.generate(
-            samples, 
-            do_sample=self.do_sample,
-            num_beams=self.num_beams,
-            max_length=self.max_len,
-            min_length=self.min_len
-        )
-        return predictions, texts
-
-    @torch.no_grad()
-    def validation_step(self, batch, batch_idx, dataloader_idx):
-        if dataloader_idx == 0:
-            start_time = timeit.default_timer()
-            _, _, text_tokens = batch
-            batch_size = text_tokens.input_ids.shape[0]
-            loss = self.blip2opt(batch)
-            print(f"batch_size: {batch_size}, time: {timeit.default_timer() - start_time}")
-            ###============== Overall Loss ===================###
-            self.log("val molecule loss", float(loss['loss']), batch_size=batch_size, sync_dist=True)
-            return loss['loss']
-        elif dataloader_idx == 1:
-            if (self.current_epoch+1) % self.caption_eval_epoch != 0:
-                return 
-            start_time = timeit.default_timer()
-            graphs, prompt_tokens, texts = batch
-            ###============== Captioning Results ===================###
-            samples = {'graphs': graphs, 'prompt_tokens': prompt_tokens}
+        if self.args.task == 'func_desc':
+            
             predictions = self.blip2opt.generate(
                 samples, 
                 do_sample=self.do_sample,
@@ -203,11 +173,47 @@ class Blip2Stage2(pl.LightningModule):
                 max_length=self.max_len,
                 min_length=self.min_len
             )
-            self.list_predictions.append(predictions)
-            self.list_targets.append(texts)
-            print(f"caption time: {timeit.default_timer() - start_time}")
-        else:
-            raise NotImplementedError
+        elif self.args.task == 'type_pred':
+            predictions = self.blip2opt.generate_from_candidates(
+                samples, 
+                self.candidate_tokens,
+                self.candidates
+            )
+            probs = self.compute_response_probabilities(prompt_tokens, self.candidate_tokens)
+        return predictions, texts
+
+    @torch.no_grad()
+    def validation_step(self, batch, batch_idx):
+        start_time = timeit.default_timer()
+        graphs, prompt_tokens, text_tokens, texts = batch
+        batch_size = text_tokens.input_ids.shape[0]
+        loss = self.blip2opt(batch)
+        # print(f"batch_size: {batch_size}, time: {timeit.default_timer() - start_time}")
+        ###============== Overall Loss ===================###
+        self.log("val graph loss (perplexity)", float(loss['loss']), batch_size=batch_size, sync_dist=True)
+        
+        if (self.current_epoch+1) % self.caption_eval_epoch != 0:
+            return loss['loss']
+        start_time = timeit.default_timer()
+        ###============== Captioning Results ===================###
+        samples = {'graphs': graphs, 'prompt_tokens': prompt_tokens}
+        if self.args.task == 'func_desc':
+            predictions = self.blip2opt.generate(
+                samples, 
+                do_sample=self.do_sample,
+                num_beams=self.num_beams,
+                max_length=self.max_len,
+                min_length=self.min_len
+            )
+        elif self.args.task == 'type_pred':
+            predictions = self.blip2opt.generate_from_candidates(
+                samples, 
+                self.candidate_tokens,
+                self.candidates
+            )
+        self.list_predictions.append(predictions)
+        self.list_targets.append(texts)
+        print(f"caption time: {timeit.default_timer() - start_time}")
     
     def on_validation_epoch_start(self) -> None:
         self.list_predictions = []
@@ -236,10 +242,10 @@ class Blip2Stage2(pl.LightningModule):
         if self.global_rank == 0:
             all_predictions = [i for ii in all_predictions for i in ii]
             all_targets = [i for ii in all_targets for i in ii]
-            self.save_predictions(all_predictions, all_targets)
+            self.save_predictions(all_predictions, all_targets, str(self.current_epoch) + '_val_')
             ## fixme: I am not sure if the max length is the same as previous experiments
             bleu2, bleu4, rouge_1, rouge_2, rouge_l, meteor_score = \
-                caption_evaluate(all_predictions, all_targets, self.tokenizer, self.max_len * 2) 
+                caption_evaluate(all_predictions, all_targets, self.blip2opt.llm_tokenizer, self.max_len * 2) 
             self.log("bleu2", bleu2, sync_dist=False)
             self.log("bleu4", bleu4, sync_dist=False)
             self.log("rouge_1", rouge_1, sync_dist=False)
@@ -265,7 +271,7 @@ class Blip2Stage2(pl.LightningModule):
             self.log("lr", self.trainer.optimizers[0].param_groups[0]['lr'], batch_size=batch_size, sync_dist=True)
             return molecule_loss + self.reaction_weight * reaction_loss
         else:
-            batch_size = batch[-1].input_ids.size(0)
+            batch_size = batch[-2].input_ids.size(0)
             ###============== Overall Loss ===================###
             loss = self.blip2opt(batch)
             self.log("total loss", float(loss['loss']), batch_size=batch_size, sync_dist=True)
@@ -292,7 +298,7 @@ class Blip2Stage2(pl.LightningModule):
         parser.add_argument('--do_sample', action='store_true', default=False)
         parser.add_argument('--max_len', type=int, default=256, help = "used in generation")
         parser.add_argument('--min_len', type=int, default=2)
-        parser.add_argument('--llm_tune', type=str, default='lora')
+        parser.add_argument('--llm_tune', action='store_true', default=False, help = "tune llm using lora or not")
         parser.add_argument('--peft_config', type=str, default=None)
         parser.add_argument('--peft_dir', type=str, default='')
 
@@ -320,5 +326,3 @@ class Blip2Stage2(pl.LightningModule):
         # load_in_4bit, default is False
         parser.add_argument('--load_in_4bit', action='store_true', default=False)
         return parent_parser
-
-

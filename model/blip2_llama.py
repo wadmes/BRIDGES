@@ -121,7 +121,7 @@ class Blip2Llama(Blip2Base):
 
     def forward(self, batch):
         # graphs, smiles_prompt_tokens, text_tokens
-        graphs, prompt_tokens, text_tokens = batch # text is the function description
+        graphs, prompt_tokens, text_tokens, _ = batch # text is the function description
         graph_embeds, graph_masks = self.graph_encoder(graphs)
         if not self.tune_gnn:
             graph_embeds = graph_embeds.detach()
@@ -136,7 +136,7 @@ class Blip2Llama(Blip2Base):
         )
         graph_tokens = self.llm_proj(query_output.last_hidden_state)
         
-        empty_targets = torch.ones(prompt_tokens.attention_mask.shape, dtype=torch.long).to(device).fill_(-100)
+        empty_targets = torch.ones(prompt_tokens.attention_mask.shape, dtype=torch.long,device = self.llm_model.device).fill_(-100)
         targets = text_tokens.input_ids.masked_fill(text_tokens.input_ids == self.llm_tokenizer.pad_token_id, -100)
         targets = torch.cat([empty_targets, targets], dim=1)
 
@@ -234,8 +234,8 @@ class Blip2Llama(Blip2Base):
         self,
         samples,
         do_sample=False,
-        num_beams=5,
-        max_length=256,
+        num_beams=1,
+        max_length=512,
         min_length=1,
         top_p=0.9,
         repetition_penalty=1.0,
@@ -257,6 +257,8 @@ class Blip2Llama(Blip2Base):
         Returns:
             captions (list): A list of strings of length batch_size * num_captions.
         """
+        import timeit
+        start = timeit.default_timer()
         graphs = samples['graphs']
         prompt_tokens = samples['prompt_tokens']
         # prompt_lens = samples['prompt_lens']
@@ -270,12 +272,10 @@ class Blip2Llama(Blip2Base):
             
             return_dict=True,
         )
-
-        device = graph_embeds.device
         graph_tokens = self.llm_proj(query_output.last_hidden_state)
         prompt_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
         prompt_embeds[prompt_tokens.is_graph_token] = graph_tokens.flatten(0, 1)
-
+        print("Time taken to generate prompt_embeds: ", timeit.default_timer() - start)
         outputs = self.llm_model.generate(
             inputs_embeds=prompt_embeds,
             attention_mask=prompt_tokens.attention_mask,
@@ -293,7 +293,92 @@ class Blip2Llama(Blip2Base):
             # use_cache=False,
         )
         # outputs[outputs == 0] = 2 # convert output id 0 to 2 (eos_token_id)
+        # print("Time taken to generate outputs: ", timeit.default_timer() - start)
         output_text = self.llm_tokenizer.batch_decode(outputs, skip_special_tokens=True)
         output_text = [text.strip() for text in output_text]
+        # print("Time taken to decode outputs: ", timeit.default_timer() - start)
         return output_text
+    
+    @torch.no_grad()
+    def generate_with_candidates(
+        self,
+        samples,
+        candidate_tokens,
+        candidates
+    ):
+        """
+        11-13-2024: This function is modified to match the prompt - graph token relations used in the forward function
+        Args:
+            samples (dict): A dictionary containing the following keys:
+                - graph, 
+                - prompt_tokens,
+            candidate_tokens,
+            candidates
+        Returns:
+            captions (list): A list of strings of length batch_size * num_captions.
+        """
+        import timeit
+        start = timeit.default_timer()
+        graphs = samples['graphs']
+        prompt_tokens = samples['prompt_tokens']
+        # prompt_lens = samples['prompt_lens']
+        graph_embeds, graph_masks = self.graph_encoder(graphs)
+        graph_embeds = self.ln_graph(graph_embeds)
+
+        query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
+        query_output = self.Qformer.bert(
+            query_embeds=query_tokens,
+            encoder_hidden_states=graph_embeds,
+            return_dict=True,
+        )
+        graph_tokens = self.llm_proj(query_output.last_hidden_state)
+        prompt_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
+        prompt_embeds[prompt_tokens.is_graph_token] = graph_tokens.flatten(0, 1) # shape is [N,seq_len, D]
+        prompt_attention_mask = prompt_tokens["attention_mask"]  # Shape: (N, seq_len)
+        
+        candidate_input_ids = candidate_tokens["input_ids"]  # Shape: (K, response_len)
+        candidate_attention_mask = candidate_tokens["attention_mask"]  # Shape: (K, response_len)
+        candidate_embeds = self.llm_model.get_input_embeddings()(candidate_input_ids) # Shape: (K, response_len, D)
+
+        num_prompts, prompt_len = prompt_tokens.input_ids.size()
+        num_candidates, candidate_len = candidate_input_ids.size()
+        hidden_dimenstion = prompt_embeds.size(-1)
+
+        # Expand prompts to match candidates
+        expanded_prompt_input_embeds = prompt_embeds.unsqueeze(1).expand(num_prompts, num_candidates, prompt_len,hidden_dimenstion)
+        expanded_prompt_attention_mask = prompt_attention_mask.unsqueeze(1).expand(num_prompts, num_candidates, prompt_len)
+
+        # Expand candidates to match prompts
+        expanded_candidate_input_embeds = candidate_embeds.unsqueeze(0).expand(num_prompts, num_candidates, candidate_len)
+        expanded_candidate_attention_mask = candidate_attention_mask.unsqueeze(0).expand(num_prompts, num_candidates, candidate_len,hidden_dimenstion)
+
+        # Concatenate prompts and candidates
+        concatenated_input_ids = torch.cat([expanded_prompt_input_embeds, concatenated_input_ids], dim=-2) # Shape: (N, K, seq_len + response_len, D)
+        concatenated_attention_mask = torch.cat([expanded_prompt_attention_mask, expanded_candidate_attention_mask], dim=-1)
+
+        # Flatten for batch processing
+        concatenated_input_ids = concatenated_input_ids.view(-1, concatenated_input_ids.size(-1))  # Shape: (N*K, seq_len + response_len)
+        concatenated_attention_mask = concatenated_attention_mask.view(-1, concatenated_attention_mask.size(-1))  # Shape: (N*K, seq_len + response_len)
+
+        # Prepare labels (same as input_ids, but pad tokens are ignored)
+        labels = concatenated_input_ids.clone()
+        labels[concatenated_attention_mask == 0] = -100  # Ignore padding tokens in loss calculation
+        with torch.no_grad():
+            outputs = self.llm_model(inputs_embeds=prompt_embeds,attention_mask=concatenated_attention_mask)
+            logits = outputs.logits  # Shape: (N*K, seq_len + response_len, vocab_size)
+
+        # Compute element-wise cross-entropy loss
+        shift_logits = logits[:, :-1, :].contiguous()
+        shift_labels = labels[:, 1:].contiguous()
+        
+        loss_fct = torch.nn.CrossEntropyLoss(reduction="none")
+        token_losses = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+        token_losses = token_losses.view(shift_labels.size())  # Shape: (N*K, seq_len + response_len - 1)
+
+        sequence_losses = token_losses[:,prompt_len-1:].sum(dim=-1)   # Sum losses for response tokens only
+        sequence_losses = sequence_losses.view(num_prompts, num_candidates)  # Reshape to (N, K)
+
+        probabilities = torch.exp(-sequence_losses)  # Convert loss to probabilities
+        best_responses = [candidates[i] for i in probabilities.argmax(dim=1)]
+        return best_responses
         

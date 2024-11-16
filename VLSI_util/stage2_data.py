@@ -11,6 +11,7 @@ from VLSI_util.data import stage1dataset
 
 """
 task: str, one of ['func_desc','type_pred']
+TrainCollater returns tokenized ids
 """
 class TrainCollater:
     def __init__(self, tokenizer, text_max_len, graph_ph, graph_token_id, prompt, task):
@@ -24,9 +25,12 @@ class TrainCollater:
         
     def __call__(self, batch):
         graphs = batch
-        if self.task == 'func_desc':
+        
+        if self.task == 'type_pred':
+            # print(f"len(graphs): {len(graphs)}")
             # remove graph with empty consistent_label
-            graphs = [graph for graph in graphs if graph.consistent_label is not ""]
+            graphs = [graph for graph in graphs if len(graph.consistent_label) > 0]
+            # print(f"after remove, len(graphs): {len(graphs)}")
         graph_batch = Batch.from_data_list(graphs)     
         
         self.tokenizer.paddding_side = 'left' # Reason for left padding here: pad pad pad prompt: geration result pad pad pad
@@ -52,52 +56,18 @@ class TrainCollater:
             raise NotImplementedError
         
         # add tokenizer.eos_token to each end of text
-        text = [f"{t}{self.tokenizer.eos_token}" for t in text]
+        text = [f"{t}<|end_of_text|>" for t in text]
 
         text_tokens = self.tokenizer(text=text,
                                      truncation=True,
                                      padding='longest',
-                                     add_special_tokens=True,
+                                     add_special_tokens=False,
                                      max_length=self.text_max_len,
                                      return_tensors='pt',
                                      return_attention_mask=True)
-        return graph_batch, prompt_tokens, text_tokens
+        return graph_batch, prompt_tokens, text_tokens, text
 
     
-
-class InferenceCollater:
-    def __init__(self, tokenizer, text_max_len, graph_ph, graph_token_id, prompt, task):
-        self.text_max_len = text_max_len
-        self.tokenizer = tokenizer
-        self.collater = Collater([], [])
-        self.graph_ph = graph_ph
-        self.graph_token_id = graph_token_id
-        self.prompt = prompt
-        self.task = task
-    def __call__(self, batch):
-        graphs = batch
-        if self.task == 'func_desc':
-            # remove graph with empty consistent_label
-            graphs = [graph for graph in graphs if graph.consistent_label is not ""]
-        graph_batch = Batch.from_data_list(graphs)   
-        ## deal with prompt
-        self.tokenizer.paddding_side = 'left' # By setting the value to 'left', you're instructing the tokenizer to add padding tokens to the left side of a text sequence.
-        prompt = [self.prompt.format(self.graph_ph)] * len(graphs)
-        if self.task == 'func_desc':
-            text = graph_batch.text
-        elif self.task == 'type_pred':
-            text = graph_batch.consistent_label
-        prompt_tokens = self.tokenizer(text=prompt, 
-                                              truncation=False,
-                                              padding='longest',
-                                              add_special_tokens=True,
-                                              return_tensors='pt',
-                                              return_attention_mask=True)
-
-        # in smiles_handler, the token graph_ph_token (<graph>) is inserted
-        is_graph_token = prompt_tokens.input_ids == self.graph_token_id # self.opt_tokenizer.graph_token_id = self.opt_tokenizer("<graph>", add_special_tokens=False).input_ids[0]
-        prompt_tokens['is_graph_token'] = is_graph_token 
-        return graph_batch, prompt_tokens, text
     
 
 
@@ -117,13 +87,44 @@ class Stage2Netlist(LightningDataModule):
         self.batch_size = batch_size
         self.inference_batch_size = args.inference_batch_size
         self.num_workers = num_workers
-        self.text_max_len = text_max_len
-        self.prompt = args.prompt
-        # self.data_set = torch.load(args.dataset_path + '/netlist.pt')
-        # self.train_dataset = self.data_set
-        # self.val_dataset = self.data_set
-        # self.test_dataset = self.data_set
-        # if mix datasets, we need to change the rtl_id
+        if args.task == 'func_desc':
+            self.text_max_len = 512
+            self.prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are a hardware description expert. Provide a single, coherent technical paragraph describing the functionality of a Verilog module.
+Constraints:
+- Use complete English sentences.
+- Avoid mentioning variable names or including any Verilog syntax.
+- Ensure the description focuses on functionality, not implementation details.
+- Do not use lists, bullet points, or code snippets.
+- Maintain a logical flow without line breaks or special formatting.
+            
+Example:
+---
+**Module Description:**
+This module implements an edge detection mechanism. It accepts an 8-bit binary input and a clock signal, 
+producing an 8-bit output that reflects the input value one cycle after an edge is detected. 
+The circuit operates by comparing the current input with the previous input to identify edges, utilizing a counter to manage the delay in output generation.
+---
+<|eot_id|>
+<|start_header_id|>user<|end_header_id|>
+Provide a detailed description of the following Verilog module. Its graph tokens are {}.<|eot_id|>
+<|start_header_id|>assistant<|end_header_id|>
+"""
+        elif args.task == 'type_pred':
+            self.prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are a specialized Verilog code analyzer focused on classifying hardware designs into specific categories. Your task is to analyze Verilog code and determine its primary design type from the following categories:
+Encryption Unit: Designs implementing cryptographic algorithms, secure hash functions, or other security-related operations
+Data Path Unit: Components handling data flow, multiplexers, decoders, registers, and data routing
+Control Logic Unit: State machines, sequence controllers, and decision-making logic
+Arithmetic Unit: Mathematical operations, ALUs, multipliers, dividers, and computational blocks
+Communication Protocol Unit: Implementations of protocols like UART, I2C, SPI, or other communication interfaces
+Signal Processing Unit: Filters, FFT implementations, signal conditioning, and digital signal processing
+Clock Management Unit: Clock generators, PLL implementations, clock dividers, and timing control
+Others: Designs that don't clearly fit into the above categories
+<|eot_id|>
+<|start_header_id|>user<|end_header_id|>
+Please analyze the following Verilog graph and classify it into one of the specified design types. Its graph tokens are {}.<|eot_id|>
+<|start_header_id|>assistant<|end_header_id|>
+"""
+            self.text_max_len = 228
         train_graphs = []
         val_graphs = []
         test_graphs = []
@@ -183,17 +184,7 @@ class Stage2Netlist(LightningDataModule):
             persistent_workers=True,
             collate_fn=TrainCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt, self.args.task),
         )
-        test_loader = DataLoader(
-            self.test_dataset,
-            batch_size=self.inference_batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-            pin_memory=False,
-            drop_last=False,
-            persistent_workers=True,
-            collate_fn=InferenceCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt, self.args.task),
-        )
-        return [val_loader, test_loader]
+        return val_loader
     
     def test_dataloader(self):
         loader = DataLoader(
@@ -204,7 +195,7 @@ class Stage2Netlist(LightningDataModule):
             pin_memory=False,
             drop_last=False,
             persistent_workers=True,
-            collate_fn=InferenceCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt, self.args.task),
+            collate_fn=TrainCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt, self.args.task),
         )
         return loader
 
