@@ -121,19 +121,22 @@ class Blip2Stage2(pl.LightningModule):
         return optimizer
 
     def test_epoch_end(self, outputs):
-        list_predictions, list_targets = zip(*outputs)
+        list_predictions, list_targets, list_netlist_ids = zip(*outputs)
         predictions = [i for ii in list_predictions for i in ii]
         targets = [i for ii in list_targets for i in ii]
+        netlist_ids = [i for ii in list_netlist_ids for i in ii]
 
         all_predictions = [None for _ in range(self.trainer.world_size)]
         all_targets = [None for _ in range(self.trainer.world_size)]
+        all_netlist_ids = [None for _ in range(self.trainer.world_size)]
         
         dist.all_gather_object(all_predictions, predictions)
         dist.all_gather_object(all_targets, targets)
+        dist.all_gather_object(all_netlist_ids, netlist_ids)
         if self.global_rank == 0:
             all_predictions = [i for ii in all_predictions for i in ii]
             all_targets = [i for ii in all_targets for i in ii]
-            self.save_predictions(all_predictions, all_targets, str(self.current_epoch) + '_test_')
+            self.save_predictions(all_predictions, all_targets, all_netlist_ids, str(self.current_epoch) + '_test_')
             ## fixme: I am not sure if the max length is the same as previous experiments
             if self.args.task == 'func_desc':
                 bleu2, bleu4, rouge_1, rouge_2, rouge_l, meteor_score = \
@@ -145,14 +148,15 @@ class Blip2Stage2(pl.LightningModule):
                 self.log("rouge_l", rouge_l, sync_dist=False)
                 self.log("meteor_score", meteor_score, sync_dist=False)
 
-    def save_predictions(self, predictions, targets,name):
+    def save_predictions(self, predictions, all_netlist_ids, targets,name):
         assert len(predictions) == len(targets)
+        assert len(predictions) == len(all_netlist_ids)
         # mkdir if args.file_names does not exist
         if not os.path.exists("./predictions"):
             os.mkdir("./predictions")
         with open(os.path.join("./predictions", name + '_' + self.args.filename + '.txt'), 'w', encoding='utf8') as f:
-            for p, t in zip(predictions, targets):
-                line = {'prediction': p, 'target': t}
+            for p, id, t in zip(predictions, all_netlist_ids, targets):
+                line = {'netlist_id':id, 'prediction': p, 'target': t}
                 f.write(json.dumps(line, ensure_ascii=True) + '\n')
 
     @torch.no_grad()
@@ -182,7 +186,7 @@ class Blip2Stage2(pl.LightningModule):
                 self.candidates
             )
             probs = self.compute_response_probabilities(prompt_tokens, self.candidate_tokens)
-        return predictions, texts
+        return predictions, texts, graphs.netlist_id.cpu().tolist()
 
     @torch.no_grad()
     def validation_step(self, batch, batch_idx):
@@ -215,11 +219,14 @@ class Blip2Stage2(pl.LightningModule):
             )
         self.list_predictions.append(predictions)
         self.list_targets.append(texts)
+
+        self.list_netlist_ids.append(graphs.netlist_id.cpu().tolist())
         # print(f"caption time: {timeit.default_timer() - start_time}")
     
     def on_validation_epoch_start(self) -> None:
         self.list_predictions = []
         self.list_targets = []
+        self.list_netlist_ids = []
     
     def on_validation_epoch_end(self) -> None:
     # def validation_epoch_end(self, outputs):
@@ -229,22 +236,27 @@ class Blip2Stage2(pl.LightningModule):
         # list_predictions, list_targets = zip(*caption_outputs)
         list_predictions = self.list_predictions
         list_targets = self.list_targets
+        list_netlist_ids = self.list_netlist_ids
         predictions = [i for ii in list_predictions for i in ii]
         targets = [i for ii in list_targets for i in ii]
+        netlist_ids = [i for ii in list_netlist_ids for i in ii]
 
         all_predictions = [None for _ in range(self.trainer.world_size)]
         all_targets = [None for _ in range(self.trainer.world_size)]
+        all_netlist_ids = [None for _ in range(self.trainer.world_size)]
         try:
             dist.all_gather_object(all_predictions, predictions)
             dist.all_gather_object(all_targets, targets)
+            dist.all_gather_object(all_netlist_ids, netlist_ids)
         except RuntimeError:
             all_predictions = [predictions]
             all_targets = [targets]
-
+            all_netlist_ids = [netlist_ids]
         if self.global_rank == 0:
             all_predictions = [i for ii in all_predictions for i in ii]
             all_targets = [i for ii in all_targets for i in ii]
-            self.save_predictions(all_predictions, all_targets, str(self.current_epoch) + '_val_')
+            all_netlist_ids = [i for ii in all_netlist_ids for i in ii]
+            self.save_predictions(all_predictions,all_netlist_ids, all_targets ,  str(self.current_epoch) + '_val_')
             ## fixme: I am not sure if the max length is the same as previous experiments
             if self.args.task == 'func_desc':
                 bleu2, bleu4, rouge_1, rouge_2, rouge_l, meteor_score = \
@@ -295,7 +307,7 @@ class Blip2Stage2(pl.LightningModule):
         parser.add_argument('--cross_attention_freq', type=int, default=2)
         parser.add_argument('--num_query_token', type=int, default=8)
         # OPT
-        parser.add_argument('--opt_model', type=str, default="meta-llama/Llama-3.2-3B", help='LLM name')
+        parser.add_argument('--opt_model', type=str, default="meta-llama/Llama-3.2-3B-Instruct", help='LLM name')
         # parser.add_argument('--prompt', type=str, default='a molecule of ')
         parser.add_argument('--num_beams', type=int, default=5)
         parser.add_argument('--do_sample', action='store_true', default=False)

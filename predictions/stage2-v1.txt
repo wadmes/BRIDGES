@@ -1,2 +1,0 @@
-{"prediction": "I'm ready to analyze the Verilog graph. Please provide the graph tokens. I'll classify it into one of the specified design types.", "target": "Data Path Units"}
-{"prediction": "I'm ready to analyze the Verilog graph. Please provide the graph tokens. I'll classify it into one of the specified design types.", "target": "Data Path Units"}

@@ -1,0 +1,4 @@
+{"netlist_id": 999, "prediction": "Others<|end_of_text|>", "target": "Control Logic Units<|end_of_text|>"}
+{"netlist_id": 1000, "prediction": "Others<|end_of_text|>", "target": "Control Logic Units<|end_of_text|>"}
+{"netlist_id": 1001, "prediction": "Others<|end_of_text|>", "target": "Control Logic Units<|end_of_text|>"}
+{"netlist_id": 1002, "prediction": "Communication Protocol Unit<|end_of_text|>", "target": "Control Logic Units<|end_of_text|>"}

@@ -1,0 +1,5 @@
+
+srun --time 3-23 --mem=400G --cpus-per-gpu=4 --pty -w node-gpu02 --gres gpu:H100:1 --reservation=ConfNov19 python stage2.py --stage1_path "all_checkpoints/stage1_test/1113.ckpt" --tune_gnn --inference_batch_size 2 --batch_size 2 --filename 3B &
+srun --time 3-23 --mem=400G --cpus-per-gpu=4 --pty -w node-gpu02 --gres gpu:H100:1 --reservation=ConfNov19 python stage2.py --stage1_path "all_checkpoints/stage1_test/1113.ckpt" --tune_gnn --inference_batch_size 4 --batch_size 4 --filename 1B --opt_model meta-llama/Llama-3.2-1B-Instruct&
+srun --time 3-23 --mem=400G --cpus-per-gpu=4 --pty -w node-gpu02 --gres gpu:H100:1 --reservation=ConfNov19 python stage2.py --stage1_path "all_checkpoints/stage1_test/1113.ckpt" --tune_gnn --inference_batch_size 2 --batch_size 2 --filename 8B --opt_model meta-llama/Llama-3.1-8B-Instruct&
+srun --time 3-23 --mem=400G --cpus-per-gpu=4 --pty -w node-gpu02 --gres gpu:H100:1 --reservation=ConfNov19 python stage2.py --stage1_path "all_checkpoints/stage1_test/1113.ckpt" --tune_gnn --inference_batch_size 2 --batch_size 2 --filename 3B_lora --llm_tune &

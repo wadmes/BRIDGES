@@ -124,7 +124,7 @@ Please analyze the following Verilog graph and classify it into one of the speci
         val_graphs = []
         test_graphs = []
         max_rtlid = 0
-        for ds_path in args.dataset_path:
+        for dataset_idx, ds_path in enumerate(args.dataset_path):
             
             this_train = torch.load(ds_path.replace('.pt', '_train.pt'))
             this_val = torch.load(ds_path.replace('.pt', '_val.pt'))
@@ -133,17 +133,15 @@ Please analyze the following Verilog graph and classify it into one of the speci
                 # remove graph with empty consistent_label
                 for graphs in [this_train, this_val, this_test]:
                     graphs = [graph for graph in graphs if len(graph.consistent_label) > 0]
-            for split_dataset in [this_train, this_val, this_test]:
-                for graph in split_dataset:
-                    graph.rtl_id += max_rtlid
-
+                    
+            for graphs in [this_train, this_val, this_test]:
+                for graph in graphs:
+                    graph.netlist_id += 1000000 * dataset_idx # hardcode to avoid netlist_id conflict
+                    graph.rtl_id += 1000000 * dataset_idx
+            
             train_graphs.extend(this_train)
             val_graphs.extend(this_val)
             test_graphs.extend(this_test)
-            # 1116 update: here we comment out updating max-rtlid, for speedup, but note that rtlid then will be not matched!!!
-            # ds = torch.load(ds_path)
-            # max_rtlid += max(ds['rtl_id_list']) + 1
-            # print(f"max_rtlid: {max_rtlid}")
         print(f"Use MIXED DATASETS! train: {len(train_graphs)}, val: {len(val_graphs)}, test: {len(test_graphs)}")
         self.train_dataset = stage1dataset(train_graphs)
         self.val_dataset = stage1dataset(val_graphs)
