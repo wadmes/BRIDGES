@@ -11,10 +11,11 @@ from VLSI_util.data import stage1dataset
 
 """
 task: str, one of ['func_desc','type_pred']
+add_file: str, one of ['', 'netlist', 'rtl']
 TrainCollater returns tokenized ids
 """
 class TrainCollater:
-    def __init__(self, tokenizer, text_max_len, graph_ph, graph_token_id, prompt, task):
+    def __init__(self, tokenizer, text_max_len, graph_ph, graph_token_id, prompt, task, add_file):
         self.text_max_len = text_max_len
         self.tokenizer = tokenizer
         self.collater = Collater([], [])
@@ -22,6 +23,7 @@ class TrainCollater:
         self.graph_token_id = graph_token_id
         self.prompt = prompt
         self.task = task
+        self.add_file = add_file
         
     def __call__(self, batch):
         graphs = batch
@@ -29,7 +31,17 @@ class TrainCollater:
         graph_batch = Batch.from_data_list(graphs)     
         
         self.tokenizer.paddding_side = 'left' # Reason for left padding here: pad pad pad prompt: geration result pad pad pad
-        prompt = [self.prompt.format(self.graph_ph)] * len(graphs)
+        if self.add_file == '':
+            prompt = [self.prompt.format(self.graph_ph)] * len(graphs)
+        elif self.add_file == 'netlist':
+            prompt = []
+            for graph in graphs:
+                prompt.append(self.prompt.format(graph.netlist[:512], self.graph_ph))
+        elif self.add_file == 'rtl':
+            prompt = []
+            for graph in graphs:
+                prompt.append(self.prompt.format(graph.rtl[:512], self.graph_ph))
+
         prompt_tokens = self.tokenizer(text=prompt, 
                                               truncation=True,
                                               padding='longest',
@@ -47,6 +59,8 @@ class TrainCollater:
             text = graph_batch.text
         elif self.task == 'type_pred':
             text = graph_batch.consistent_label
+            for t in text:
+                t = t.replace('Units', 'Unit')
         else:
             raise NotImplementedError
         
@@ -84,7 +98,8 @@ class Stage2Netlist(LightningDataModule):
         self.num_workers = num_workers
         if args.task == 'func_desc':
             self.text_max_len = 512
-            self.prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are a hardware description expert. Provide a single, coherent technical paragraph describing the functionality of a Verilog module.
+            if args.add_file == '':
+                self.prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are a hardware description expert. Provide a single, coherent technical paragraph describing the functionality of a Verilog module.
 Constraints:
 - Use complete English sentences.
 - Avoid mentioning variable names or including any Verilog syntax.
@@ -104,8 +119,52 @@ The circuit operates by comparing the current input with the previous input to i
 Provide a detailed description of the following Verilog module. Its graph tokens are {}.<|eot_id|>
 <|start_header_id|>assistant<|end_header_id|>
 """
+            elif args.add_file == 'netlist':
+                self.prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are a hardware description expert. Provide a single, coherent technical paragraph describing the functionality of a Verilog module.
+Constraints:
+- Use complete English sentences.
+- Avoid mentioning variable names or including any Verilog syntax.
+- Ensure the description focuses on functionality, not implementation details.
+- Do not use lists, bullet points, or code snippets.
+- Maintain a logical flow without line breaks or special formatting.
+            
+Example:
+---
+**Module Description:**
+This module implements an edge detection mechanism. It accepts an 8-bit binary input and a clock signal, 
+producing an 8-bit output that reflects the input value one cycle after an edge is detected. 
+The circuit operates by comparing the current input with the previous input to identify edges, utilizing a counter to manage the delay in output generation.
+---
+<|eot_id|>
+<|start_header_id|>user<|end_header_id|>
+Provide a detailed description of the following Verilog module. Its verilog code is {}. Its graph representations are {}.<|eot_id|>
+<|start_header_id|>assistant<|end_header_id|>
+"""
+            elif args.add_file == 'rtl':
+                self.prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are a hardware description expert. Provide a single, coherent technical paragraph describing the functionality of a Verilog module.
+Constraints:
+- Use complete English sentences.
+- Avoid mentioning variable names or including any Verilog syntax.
+- Ensure the description focuses on functionality, not implementation details.
+- Do not use lists, bullet points, or code snippets.
+- Maintain a logical flow without line breaks or special formatting.
+            
+Example:
+---
+**Module Description:**
+This module implements an edge detection mechanism. It accepts an 8-bit binary input and a clock signal, 
+producing an 8-bit output that reflects the input value one cycle after an edge is detected. 
+The circuit operates by comparing the current input with the previous input to identify edges, utilizing a counter to manage the delay in output generation.
+---
+<|eot_id|>
+<|start_header_id|>user<|end_header_id|>
+Provide a detailed description of the following Verilog module. Its RTL code is {}. Its graph representations are {}.<|eot_id|>
+<|start_header_id|>assistant<|end_header_id|>
+"""
         elif args.task == 'type_pred':
-            self.prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are a specialized Verilog code analyzer focused on classifying hardware designs into specific categories. Your task is to analyze Verilog code and determine its primary design type from the following categories:
+            self.text_max_len = 228
+            if args.add_file == '':
+                self.prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are a specialized Verilog code analyzer focused on classifying hardware designs into specific categories. Your task is to analyze Verilog code and determine its primary design type from the following categories:
 Encryption Unit: Designs implementing cryptographic algorithms, secure hash functions, or other security-related operations
 Data Path Unit: Components handling data flow, multiplexers, decoders, registers, and data routing
 Control Logic Unit: State machines, sequence controllers, and decision-making logic
@@ -119,7 +178,38 @@ Others: Designs that don't clearly fit into the above categories
 Please analyze the following Verilog graph and classify it into one of the specified design types. Its graph tokens are {}.<|eot_id|>
 <|start_header_id|>assistant<|end_header_id|>
 """
-            self.text_max_len = 228
+            
+            elif args.add_file == 'netlist':
+                self.prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are a specialized Verilog code analyzer focused on classifying hardware designs into specific categories. Your task is to analyze Verilog code and determine its primary design type from the following categories:
+Encryption Unit: Designs implementing cryptographic algorithms, secure hash functions, or other security-related operations
+Data Path Unit: Components handling data flow, multiplexers, decoders, registers, and data routing
+Control Logic Unit: State machines, sequence controllers, and decision-making logic
+Arithmetic Unit: Mathematical operations, ALUs, multipliers, dividers, and computational blocks
+Communication Protocol Unit: Implementations of protocols like UART, I2C, SPI, or other communication interfaces
+Signal Processing Unit: Filters, FFT implementations, signal conditioning, and digital signal processing
+Clock Management Unit: Clock generators, PLL implementations, clock dividers, and timing control
+Others: Designs that don't clearly fit into the above categories
+<|eot_id|>
+<|start_header_id|>user<|end_header_id|>
+Please analyze the following Verilog graph and classify it into one of the specified design types. Its verilog code is {}. Its graph tokens are {}.<|eot_id|>
+<|start_header_id|>assistant<|end_header_id|>
+"""
+            elif args.add_file == 'rtl':
+                self.prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are a specialized Verilog code analyzer focused on classifying hardware designs into specific categories. Your task is to analyze Verilog code and determine its primary design type from the following categories:
+Encryption Unit: Designs implementing cryptographic algorithms, secure hash functions, or other security-related operations
+Data Path Unit: Components handling data flow, multiplexers, decoders, registers, and data routing
+Control Logic Unit: State machines, sequence controllers, and decision-making logic
+Arithmetic Unit: Mathematical operations, ALUs, multipliers, dividers, and computational blocks
+Communication Protocol Unit: Implementations of protocols like UART, I2C, SPI, or other communication interfaces
+Signal Processing Unit: Filters, FFT implementations, signal conditioning, and digital signal processing
+Clock Management Unit: Clock generators, PLL implementations, clock dividers, and timing control
+Others: Designs that don't clearly fit into the above categories
+<|eot_id|>
+<|start_header_id|>user<|end_header_id|>
+Please analyze the following Verilog graph and classify it into one of the specified design types. Its RTL code is {}. Its graph tokens are {}.<|eot_id|>
+<|start_header_id|>assistant<|end_header_id|>
+"""
+        
         train_graphs = []
         val_graphs = []
         test_graphs = []
@@ -169,7 +259,7 @@ Please analyze the following Verilog graph and classify it into one of the speci
             pin_memory=False,
             drop_last=True,
             persistent_workers=True,
-            collate_fn=TrainCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt, self.args.task),
+            collate_fn=TrainCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt, self.args.task, self.args.add_file),
         )
         return loader
 
@@ -182,7 +272,7 @@ Please analyze the following Verilog graph and classify it into one of the speci
             pin_memory=False,
             drop_last=False,
             persistent_workers=True,
-            collate_fn=TrainCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt, self.args.task),
+            collate_fn=TrainCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt, self.args.task, self.args.add_file),
         )
         return val_loader
     
@@ -195,7 +285,7 @@ Please analyze the following Verilog graph and classify it into one of the speci
             pin_memory=False,
             drop_last=False,
             persistent_workers=True,
-            collate_fn=TrainCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt, self.args.task),
+            collate_fn=TrainCollater(self.tokenizer, self.text_max_len, self.graph_ph_token, self.graph_token_id, self.prompt, self.args.task, self.args.add_file),
         )
         return loader
 
@@ -209,5 +299,7 @@ Please analyze the following Verilog graph and classify it into one of the speci
         parser.add_argument('--prompt', type=str, default='The graph of this module is [START_NETLIST_GRAPH]{}[END__NETLIST_GRAPH].')
         # task, default is 'type_pred'
         parser.add_argument('--task', type=str, default='type_pred', help='one of [func_desc, type_pred]')
+        # add_file, default is ''
+        parser.add_argument('--add_file', type=str, default='', help='add file options to the prompt, can be empty, `netlist`, `rtl`')
         return parent_parser
     

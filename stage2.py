@@ -10,6 +10,7 @@ from model.blip2_stage2 import Blip2Stage2
 from VLSI_util.stage2_data import Stage2Netlist
 from VLSI_util.data import netlistDataset
 from pytorch_lightning.strategies import DDPStrategy
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 # torch.set_default_dtype(torch.float16)
 
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
@@ -58,6 +59,8 @@ def main(args):
     # data
     dm = Stage2Netlist(args.mode, args.num_workers, args.batch_size, args.text_max_len, tokenizer, args)
     callbacks = []
+    callbacks.append(EarlyStopping(monitor='val graph loss (perplexity)', mode = 'min', patience=2))
+    
     ## fixme save only used parameters
     # callbacks.append(plc.ModelCheckpoint(dirpath="all_checkpoints/"+args.filename+"/", every_n_epochs=10, save_top_k=-1))
     callbacks.append(plc.ModelCheckpoint(dirpath="all_checkpoints/"+args.filename+"/", 
