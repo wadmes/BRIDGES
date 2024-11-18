@@ -336,8 +336,9 @@ class Blip2Llama(Blip2Base):
         prompt_embeds[prompt_tokens.is_graph_token] = graph_tokens.flatten(0, 1) # shape is [N,seq_len, D]
         prompt_attention_mask = prompt_tokens["attention_mask"]  # Shape: (N, seq_len)
         
-        candidate_input_ids = candidate_tokens["input_ids"]  # Shape: (K, response_len)
-        candidate_attention_mask = candidate_tokens["attention_mask"]  # Shape: (K, response_len)
+        device = graph_embeds.device
+        candidate_input_ids = candidate_tokens["input_ids"].to(device)  # Shape: (K, response_len)
+        candidate_attention_mask = candidate_tokens["attention_mask"].to(device)  # Shape: (K, response_len)
         candidate_embeds = self.llm_model.get_input_embeddings()(candidate_input_ids) # Shape: (K, response_len, D)
 
         num_prompts, prompt_len = prompt_tokens.input_ids.size()

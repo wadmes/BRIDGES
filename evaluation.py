@@ -153,8 +153,8 @@ def calculate_accuracies(csv1_path, csv2_path):
     df1 = pd.read_csv(csv1_path)
     df2 = pd.read_csv(csv2_path)
 
-    # Merge the two DataFrames on netlist_id
-    merged_df = pd.merge(df1, df2, on="netlist_id")
+    # Merge the two DataFrames on netlist_id (df1) and id (df2)
+    merged_df = pd.merge(df1, df2, left_on="netlist_id", right_on="id", how="inner")
 
     # Define node ranges
     ranges = [
@@ -171,14 +171,14 @@ def calculate_accuracies(csv1_path, csv2_path):
     # Calculate accuracy for each range
     range_accuracies = {}
     for range_name, condition in ranges:
-        filtered_df = merged_df[merged_df["#nodes"].apply(condition)]
+        filtered_df = merged_df[merged_df["#node"].apply(condition)]
         if len(filtered_df) > 0:
-            range_accuracies[range_name] = filtered_df["correct"].mean()
+            range_accuracies[range_name] = float(round(filtered_df["correct"].mean(),4))
         else:
             range_accuracies[range_name] = None  # No data points in this range
 
-    # Combine results into a dictionary
-    accuracies = {"overall": overall_accuracy}
+    # Combine results into a dictionary. keep overall_accuracy for 2 decimal places
+    accuracies = {"overall": float(round(overall_accuracy, 4))}
     accuracies.update(range_accuracies)
 
     return accuracies
@@ -193,6 +193,8 @@ def calculate_accuracies(csv1_path, csv2_path):
 
 # for all .txt file in /home/weili3/VLSI-LLM-Graph/predictions, run convert_predictions_to_json and count_mismatches
 import os
+all_results = {}
+all_results = {"epoch":[], "run_name":[], "accuracy":[], "<10": [], "[10, 100)": [], "[100, 1000)": [], "[1000, 10000)": [], ">10000": []}
 for file in os.listdir("/home/weili3/VLSI-LLM-Graph/predictions"):
     if file.endswith(".txt"):
         print(f"Processing {file}...")
@@ -201,5 +203,20 @@ for file in os.listdir("/home/weili3/VLSI-LLM-Graph/predictions"):
         convert_predictions_to_json(input_file, output_file)
         count_mismatches(output_file)
         csv_file = output_file.replace(".json", ".csv")
-        calculate_accuracies(csv_file,)
+        result = calculate_accuracies(csv_file,"/home/weili3/VLSI-LLM/data_collection/BRIDGES.csv")
+        print(result)
+        epoch = file.split("__")[0].split("_")[0]
+        run_name = file.split("__")[1].replace(".txt", "")
+        all_results["epoch"].append(epoch)
+        all_results["run_name"].append(run_name)
+        all_results["accuracy"].append(result["overall"])
+        all_results["<10"].append(result["<10"])
+        all_results["[10, 100)"].append(result["[10, 100)"])
+        all_results["[100, 1000)"].append(result["[100, 1000)"])
+        all_results["[1000, 10000)"].append(result["[1000, 10000)"])
+        all_results[">10000"].append(result[">10000"])
+
         print("##################\n")
+
+df = pd.DataFrame(all_results)
+df.to_csv("/home/weili3/VLSI-LLM-Graph/predictions/summary.csv", index=False)

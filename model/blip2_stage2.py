@@ -309,7 +309,7 @@ class Blip2Stage2(pl.LightningModule):
         # OPT
         parser.add_argument('--opt_model', type=str, default="meta-llama/Llama-3.2-3B-Instruct", help='LLM name')
         # parser.add_argument('--prompt', type=str, default='a molecule of ')
-        parser.add_argument('--num_beams', type=int, default=5)
+        parser.add_argument('--num_beams', type=int, default=2)
         parser.add_argument('--do_sample', action='store_true', default=False)
         parser.add_argument('--max_len', type=int, default=256, help = "used in generation")
         parser.add_argument('--min_len', type=int, default=2)

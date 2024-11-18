@@ -70,9 +70,11 @@ def main(args):
                                          save_top_k=-1,
                                          save_on_train_epoch_end=True))
     logger = WandbLogger(project='stage-2-' + args.task, dir='./wandb-log', name = args.filename)
-    trainer = Trainer(fast_dev_run = False,precision=args.precision, max_epochs=args.max_epochs, val_check_interval=args.val_check_interval, callbacks=callbacks, logger=logger, strategy=DDPStrategy(find_unused_parameters=True, static_graph=True))
+    # trainer = Trainer(fast_dev_run = False,precision=args.precision, max_epochs=args.max_epochs, val_check_interval=args.val_check_interval, callbacks=callbacks, logger=logger, strategy=DDPStrategy(find_unused_parameters=True, static_graph=True))
+    trainer = Trainer(fast_dev_run = False,precision=args.precision, max_epochs=args.max_epochs, val_check_interval=args.val_check_interval, callbacks=callbacks, logger=logger, strategy="deepspeed_stage_2")
     if args.mode in {'pretrain', 'ft'}:
         trainer.fit(model, datamodule=dm, ckpt_path=args.ckpt_path)
+        trainer.test(model, datamodule=dm)
     elif args.mode == 'eval':
         trainer.fit_loop.epoch_progress.current.completed = args.caption_eval_epoch - 1
         trainer.validate(model, datamodule=dm)
@@ -91,7 +93,7 @@ def get_args():
     parser = Blip2Stage2.add_model_specific_args(parser)  # add model args
     parser = Stage2Netlist.add_model_specific_args(parser)
     parser.add_argument('--precision', type=str, default='bf16-mixed', help= "the precision argument for the trainer, could be bf16-mixed, transformer-engine, for details, refer to https://lightning.ai/docs/pytorch/2.4.0/common/trainer.html#precision")
-    parser.add_argument('--max_epochs', type=int, default=6)
+    parser.add_argument('--max_epochs', type=int, default=3)
     parser.add_argument('--val_check_interval', type=float, default=1.0)
     args = parser.parse_args()
 
