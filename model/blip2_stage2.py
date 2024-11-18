@@ -328,7 +328,7 @@ class Blip2Stage2(pl.LightningModule):
         parser.add_argument('--reaction_weight', type=float, default=1.0, help = "deprecated in our project (for reaction)")
         parser.add_argument('--weight_decay', type=float, default=0.05, help='optimizer weight decay')
         parser.add_argument('--init_lr', type=float, default=1e-4, help='optimizer init learning rate')
-        parser.add_argument('--min_lr', type=float, default=1e-5, help='optimizer min learning rate')
+        parser.add_argument('--min_lr', type=float, default=5e-5, help='optimizer min learning rate')
         parser.add_argument('--warmup_lr', type=float, default=1e-6, help='optimizer warmup learning rate')
         parser.add_argument('--warmup_steps', type=int, default=1000, help='optimizer warmup steps')
         parser.add_argument('--lr_decay_rate', type=float, default=0.9, help='optimizer lr decay rate')

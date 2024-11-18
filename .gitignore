@@ -1,5 +1,6 @@
 *.json
 *.txt
+*.csv
 wandb
 lightning_logs
 N2V-data
