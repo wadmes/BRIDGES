@@ -95,6 +95,8 @@ def get_args():
     parser.add_argument('--precision', type=str, default='bf16-mixed', help= "the precision argument for the trainer, could be bf16-mixed, transformer-engine, for details, refer to https://lightning.ai/docs/pytorch/2.4.0/common/trainer.html#precision")
     parser.add_argument('--max_epochs', type=int, default=3)
     parser.add_argument('--val_check_interval', type=float, default=1.0)
+    # use_graph, ( use graph embedding information, if not, set embeds as 0)
+    parser.add_argument('--use_graph', type=int, default=1)
     args = parser.parse_args()
 
     print("=========================================")

@@ -1,0 +1,1 @@
+python func_desc.py --model_name meta-llama/Llama-3.1-8B-Instruct --dataset_path /scratch/weili3/RTLCoder26532_val.pt --use_data netlist

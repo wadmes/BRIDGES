@@ -1,2 +1,0 @@
-{"netlist_id": 999, "prediction": "Arithmetic Unit<|end_of_text|>", "target": "Control Logic Units<|end_of_text|>"}
-{"netlist_id": 1000, "prediction": "Arithmetic Unit<|end_of_text|>", "target": "Control Logic Units<|end_of_text|>"}

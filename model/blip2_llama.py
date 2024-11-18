@@ -65,23 +65,25 @@ class Blip2Llama(Blip2Base):
         args=None,
     ):
         super().__init__()
-        self.graph_encoder, self.ln_graph = self.init_graph_encoder(gin_num_layers, gin_hidden_dim, gin_drop_ratio)
-        self.tune_gnn = tune_gnn
-        if not tune_gnn:
-            for name, param in self.graph_encoder.named_parameters():
-                param.requires_grad = False
-            self.graph_encoder = self.graph_encoder.eval()
-            self.graph_encoder.train = disabled_train
-            logging.info("freeze graph encoder")
-        
-        self.Qformer, self.query_tokens = self.init_Qformer(bert_name, num_query_token, self.graph_encoder.num_features, cross_attention_freq)
-        ### remove the unused parameters
-        self.Qformer.cls = None
-        self.Qformer.bert.embeddings.word_embeddings = None
-        self.Qformer.bert.embeddings.position_embeddings = None
-        for layer in self.Qformer.bert.encoder.layer:
-            layer.output = None
-            layer.intermediate = None
+        self.args = args
+        if self.args.use_graph == 1:
+            self.graph_encoder, self.ln_graph = self.init_graph_encoder(gin_num_layers, gin_hidden_dim, gin_drop_ratio)
+            self.tune_gnn = tune_gnn
+            if not tune_gnn:
+                for name, param in self.graph_encoder.named_parameters():
+                    param.requires_grad = False
+                self.graph_encoder = self.graph_encoder.eval()
+                self.graph_encoder.train = disabled_train
+                logging.info("freeze graph encoder")
+            
+            self.Qformer, self.query_tokens = self.init_Qformer(bert_name, num_query_token, self.graph_encoder.num_features, cross_attention_freq)
+            ### remove the unused parameters
+            self.Qformer.cls = None
+            self.Qformer.bert.embeddings.word_embeddings = None
+            self.Qformer.bert.embeddings.position_embeddings = None
+            for layer in self.Qformer.bert.encoder.layer:
+                layer.output = None
+                layer.intermediate = None
 
         ## initialize opt model
         
@@ -122,26 +124,28 @@ class Blip2Llama(Blip2Base):
     def forward(self, batch):
         # graphs, smiles_prompt_tokens, text_tokens
         graphs, prompt_tokens, text_tokens, _ = batch # text is the function description
-        graph_embeds, graph_masks = self.graph_encoder(graphs)
-        if not self.tune_gnn:
-            graph_embeds = graph_embeds.detach()
-        graph_embeds = self.ln_graph(graph_embeds)
-        device = graph_embeds.device
-        query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
-        query_output = self.Qformer.bert(
-            query_embeds=query_tokens,
-            encoder_hidden_states=graph_embeds,
-             # fixme: check whether this mask is correct
-            return_dict=True,
-        )
-        graph_tokens = self.llm_proj(query_output.last_hidden_state)
+        if self.args.use_graph == 1:
+            graph_embeds, graph_masks = self.graph_encoder(graphs)
+            if not self.tune_gnn:
+                graph_embeds = graph_embeds.detach()
+            graph_embeds = self.ln_graph(graph_embeds)
+            device = graph_embeds.device
+            query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
+            query_output = self.Qformer.bert(
+                query_embeds=query_tokens,
+                encoder_hidden_states=graph_embeds,
+                # fixme: check whether this mask is correct
+                return_dict=True,
+            )
+            graph_tokens = self.llm_proj(query_output.last_hidden_state)
         
         empty_targets = torch.ones(prompt_tokens.attention_mask.shape, dtype=torch.long,device = self.llm_model.device).fill_(-100)
         targets = text_tokens.input_ids.masked_fill(text_tokens.input_ids == self.llm_tokenizer.pad_token_id, -100)
         targets = torch.cat([empty_targets, targets], dim=1)
 
         prompt_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
-        prompt_embeds[prompt_tokens.is_graph_token] = graph_tokens.flatten(0, 1) # change graph placeholder to the actual graph tokens from graph
+        if self.args.use_graph == 1:
+            prompt_embeds[prompt_tokens.is_graph_token] = graph_tokens.flatten(0, 1) # change graph placeholder to the actual graph tokens from graph
         inputs_embeds = self.llm_model.get_input_embeddings()(text_tokens.input_ids)
         inputs_embeds = torch.cat((prompt_embeds, inputs_embeds), dim=1)
         attention_mask = torch.cat([prompt_tokens.attention_mask, text_tokens.attention_mask], dim=1)
