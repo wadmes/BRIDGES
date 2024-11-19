@@ -1,8 +1,8 @@
 
 module test (cin,  a_0, a_1, a_2, a_3, a_4, a_5, a_6, a_7, a_8, a_9, a_10, a_11, a_12, a_13, a_14, a_15, 
    b_0, b_1, b_2, b_3, b_4, b_5, b_6, b_7, b_8, b_9, b_10, b_11, b_12, b_13, b_14, b_15,
-   sum_0, sum_1, sum_2, sum_3, sum_4, sum_5, sum_6, sum_7, sum_8, sum_9, sum_10, sum_11, 
-   sum_12, sum_13, sum_14, sum_15, cout );
+   anoymous_0, anoymous_1, anoymous_2, anoymous_3, anoymous_4, anoymous_5, anoymous_6, anoymous_7, anoymous_8, anoymous_9, anoymous_10, anoymous_11, 
+   anoymous_12, anoymous_13, anoymous_14, anoymous_15, cout );
   
   input cin;
   input a_0;
@@ -40,44 +40,44 @@ module test (cin,  a_0, a_1, a_2, a_3, a_4, a_5, a_6, a_7, a_8, a_9, a_10, a_11,
   input b_15;
 
 
-  output sum_0;
-  output sum_1;
-  output sum_2;
-  output sum_3;
-  output sum_4;
-  output sum_5;
-  output sum_6;
-  output sum_7;
-  output sum_8;
-  output sum_9;
-  output sum_10;
-  output sum_11;
-  output sum_12;
-  output sum_13;
-  output sum_14;
-  output sum_15;
+  output anoymous_0;
+  output anoymous_1;
+  output anoymous_2;
+  output anoymous_3;
+  output anoymous_4;
+  output anoymous_5;
+  output anoymous_6;
+  output anoymous_7;
+  output anoymous_8;
+  output anoymous_9;
+  output anoymous_10;
+  output anoymous_11;
+  output anoymous_12;
+  output anoymous_13;
+  output anoymous_14;
+  output anoymous_15;
   
   output cout;
 
   //correct key = 101110101000010
 
 
-	xor gate_sum_9 (sum_9, n64, n65);
-	xor gate_sum_8 (sum_8, n66, n67);
-	xor gate_sum_7 (sum_7, n68, n69);
-	xor gate_sum_6 (sum_6, n70, n71);
-	xor gate_sum_5 (sum_5, n72, n73);
-	xor gate_sum_4 (sum_4, n74, n75);
-	xor gate_sum_3 (sum_3, n76, n77);
-	xor gate_sum_2 (sum_2, n78, n79);
-	xor gate_sum_1 (sum_1, n80, n81);
-	xor gate_sum_15 (sum_15, n82, n83);
-	xor gate_sum_14 (sum_14, n84, n85);
-	xor gate_sum_13 (sum_13, n86, n87);
-	xor gate_sum_12 (sum_12, n88, n89);
-	xor gate_sum_11 (sum_11, n90, n91);
-	xor gate_sum_10 (sum_10, n92, n93);
-	xor gate_sum_0 (sum_0, cin, n94);
+	xor gate_anoymous_9 (anoymous_9, n64, n65);
+	xor gate_anoymous_8 (anoymous_8, n66, n67);
+	xor gate_anoymous_7 (anoymous_7, n68, n69);
+	xor gate_anoymous_6 (anoymous_6, n70, n71);
+	xor gate_anoymous_5 (anoymous_5, n72, n73);
+	xor gate_anoymous_4 (anoymous_4, n74, n75);
+	xor gate_anoymous_3 (anoymous_3, n76, n77);
+	xor gate_anoymous_2 (anoymous_2, n78, n79);
+	xor gate_anoymous_1 (anoymous_1, n80, n81);
+	xor gate_anoymous_15 (anoymous_15, n82, n83);
+	xor gate_anoymous_14 (anoymous_14, n84, n85);
+	xor gate_anoymous_13 (anoymous_13, n86, n87);
+	xor gate_anoymous_12 (anoymous_12, n88, n89);
+	xor gate_anoymous_11 (anoymous_11, n90, n91);
+	xor gate_anoymous_10 (anoymous_10, n92, n93);
+	xor gate_anoymous_0 (anoymous_0, cin, n94);
 	nand gate_cout (cout, n95, n96);
 	nand gate_n96 (n96, n82, n83);
 	nand gate_n83 (n83, n97, n98);

@@ -1,5 +1,5 @@
 
-module test ( a_0, a_1, a_2, a_3, a_4, a_5, a_6, a_7, b_0, b_1, b_2, b_3, b_4, b_5, b_6, b_7, sum );
+module test ( a_0, a_1, a_2, a_3, a_4, a_5, a_6, a_7, b_0, b_1, b_2, b_3, b_4, b_5, b_6, b_7, anoymous );
   
   input a_0;
   input a_1;
@@ -19,10 +19,10 @@ module test ( a_0, a_1, a_2, a_3, a_4, a_5, a_6, a_7, b_0, b_1, b_2, b_3, b_4, b
   input b_6;
   input b_7;
   
-  output sum;
+  output anoymous;
   
 
-	and gate_sum (sum, n3, n4);
+	and gate_anoymous (anoymous, n3, n4);
 	nor gate_n4 (n4, n5, n6, n7, n8);
 	xor gate_n8 (n8, b_5, a_5);
 	xor gate_n7 (n7, b_4, a_4);

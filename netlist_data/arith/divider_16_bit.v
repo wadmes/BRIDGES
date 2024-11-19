@@ -392,7 +392,7 @@ module test(a15, a14, a13, a12, a11, a10, a9, a8, a7, a6, a5, a4, a3,
   wire n_12924, n_12925, n_12926, n_12927, n_12928, n_12929, n_12930,
        n_12931;
   wire n_12932, n_12933, n_12934, n_12935;
-  nand div_7_240_g105 (n_9353, b6, b7);
+  nand anoymous (n_9353, b6, b7);
   or g16819 (n_9413, b4, wc);
   not gc (wc, n_9402);
   or g16853 (n_9429, b5, wc0);

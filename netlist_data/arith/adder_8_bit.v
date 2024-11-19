@@ -1,6 +1,6 @@
 
 module test ( cin, a_0, a_1, a_2, a_3, a_4, a_5, a_6, a_7, 
-  b_0, b_1, b_2, b_3, b_4, b_5, b_6, b_7, sum_0, sum_1, sum_2, sum_3, sum_4, sum_5, sum_6, sum_7, cout );
+  b_0, b_1, b_2, b_3, b_4, b_5, b_6, b_7, anoymous_0, anoymous_1, anoymous_2, anoymous_3, anoymous_4, anoymous_5, anoymous_6, anoymous_7, cout );
 
   input cin;
   input a_0;
@@ -21,25 +21,25 @@ module test ( cin, a_0, a_1, a_2, a_3, a_4, a_5, a_6, a_7,
   input b_6;
   input b_7;
 
-  output sum_0;
-  output sum_1;
-  output sum_2;
-  output sum_3;
-  output sum_4;
-  output sum_5;
-  output sum_6;
-  output sum_7;
+  output anoymous_0;
+  output anoymous_1;
+  output anoymous_2;
+  output anoymous_3;
+  output anoymous_4;
+  output anoymous_5;
+  output anoymous_6;
+  output anoymous_7;
  
   output cout;
 
-	xor gate_sum_7 (sum_7, n32, n33);
-	xor gate_sum_6 (sum_6, n34, n35);
-	xor gate_sum_5 (sum_5, n36, n37);
-	xor gate_sum_4 (sum_4, n38, n39);
-	xor gate_sum_3 (sum_3, n40, n41);
-	xor gate_sum_2 (sum_2, n42, n43);
-	xor gate_sum_1 (sum_1, n44, n45);
-	xor gate_sum_0 (sum_0, cin, n46);
+	xor gate_anoymous_7 (anoymous_7, n32, n33);
+	xor gate_anoymous_6 (anoymous_6, n34, n35);
+	xor gate_anoymous_5 (anoymous_5, n36, n37);
+	xor gate_anoymous_4 (anoymous_4, n38, n39);
+	xor gate_anoymous_3 (anoymous_3, n40, n41);
+	xor gate_anoymous_2 (anoymous_2, n42, n43);
+	xor gate_anoymous_1 (anoymous_1, n44, n45);
+	xor gate_anoymous_0 (anoymous_0, cin, n46);
 	nand gate_cout (cout, n47, n48);
 	nand gate_n48 (n48, n32, n33);
 	nand gate_n33 (n33, n49, n50);
