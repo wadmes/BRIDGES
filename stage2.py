@@ -11,13 +11,14 @@ from VLSI_util.stage2_data import Stage2Netlist
 from VLSI_util.data import netlistDataset
 from pytorch_lightning.strategies import DDPStrategy
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from pytorch_lightning.callbacks import ModelSummary
 # torch.set_default_dtype(torch.float16)
 
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
 ## for pyg bug
 warnings.filterwarnings('ignore', category=UserWarning, message='TypedStorage is deprecated')
 ## for A5000 gpus
-# torch.set_float32_matmul_precision('medium') # can be medium (bfloat16), high (tensorfloat32), highest (float32)
+torch.set_float32_matmul_precision('medium') # can be medium (bfloat16), high (tensorfloat32), highest (float32)
 # torch.set_default_dtype(torch.bfloat16)
 # strategy = strategies.DDPStrategy(find_unused_parameters=find_unused_parameters, start_method='spawn')
 # class MyDDPSpawnStrategy(strategies.DDPSpawnStrategy):
@@ -60,6 +61,7 @@ def main(args):
     dm = Stage2Netlist(args.mode, args.num_workers, args.batch_size, args.text_max_len, tokenizer, args)
     callbacks = []
     callbacks.append(EarlyStopping(monitor='val graph loss (perplexity)', mode = 'min', patience=2))
+    callbacks.append(ModelSummary(max_depth=3))
     
     ## fixme save only used parameters
     # callbacks.append(plc.ModelCheckpoint(dirpath="all_checkpoints/"+args.filename+"/", every_n_epochs=10, save_top_k=-1))

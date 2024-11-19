@@ -120,7 +120,7 @@ class Blip2Stage2(pl.LightningModule):
                 raise NotImplementedError()
         return optimizer
 
-    def test_epoch_end(self, outputs):
+    def on_test_epoch_end(self, outputs):
         list_predictions, list_targets, list_netlist_ids = zip(*outputs)
         predictions = [i for ii in list_predictions for i in ii]
         targets = [i for ii in list_targets for i in ii]
@@ -185,7 +185,6 @@ class Blip2Stage2(pl.LightningModule):
                 self.candidate_tokens,
                 self.candidates
             )
-            probs = self.compute_response_probabilities(prompt_tokens, self.candidate_tokens)
         return predictions, texts, graphs.netlist_id.cpu().tolist()
 
     @torch.no_grad()

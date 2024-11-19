@@ -138,7 +138,7 @@ def convert_predictions_to_json(input_file: str, output_file: str):
 
 import pandas as pd
 
-def calculate_accuracies(csv1_path, csv2_path):
+def calculate_accuracies(df1, df2):
     """
     Calculates overall accuracy and accuracies for different node count ranges.
     
@@ -149,9 +149,7 @@ def calculate_accuracies(csv1_path, csv2_path):
     Returns:
         dict: A dictionary containing overall accuracy and accuracies for each node range.
     """
-    # Load the CSV files into DataFrames
-    df1 = pd.read_csv(csv1_path)
-    df2 = pd.read_csv(csv2_path)
+
 
     # Merge the two DataFrames on netlist_id (df1) and id (df2)
     merged_df = pd.merge(df1, df2, left_on="netlist_id", right_on="id", how="inner")
@@ -192,31 +190,74 @@ def calculate_accuracies(csv1_path, csv2_path):
 # count_mismatches("/home/weili3/VLSI-LLM-Graph/predictions/2_val__3B_lora.json")
 
 # for all .txt file in /home/weili3/VLSI-LLM-Graph/predictions, run convert_predictions_to_json and count_mismatches
-import os
-all_results = {}
-all_results = {"epoch":[], "run_name":[], "accuracy":[], "<10": [], "[10, 100)": [], "[100, 1000)": [], "[1000, 10000)": [], ">10000": []}
-for file in os.listdir("/home/weili3/VLSI-LLM-Graph/predictions"):
-    if file.endswith(".txt"):
-        print(f"Processing {file}...")
-        input_file = os.path.join("/home/weili3/VLSI-LLM-Graph/predictions", file)
-        output_file = input_file.replace(".txt", ".json")
-        convert_predictions_to_json(input_file, output_file)
-        count_mismatches(output_file)
-        csv_file = output_file.replace(".json", ".csv")
-        result = calculate_accuracies(csv_file,"/home/weili3/VLSI-LLM/data_collection/BRIDGES.csv")
-        print(result)
-        epoch = file.split("__")[0].split("_")[0]
-        run_name = file.split("__")[1].replace(".txt", "")
-        all_results["epoch"].append(epoch)
-        all_results["run_name"].append(run_name)
-        all_results["accuracy"].append(result["overall"])
-        all_results["<10"].append(result["<10"])
-        all_results["[10, 100)"].append(result["[10, 100)"])
-        all_results["[100, 1000)"].append(result["[100, 1000)"])
-        all_results["[1000, 10000)"].append(result["[1000, 10000)"])
-        all_results[">10000"].append(result[">10000"])
 
-        print("##################\n")
+def evaluate_bridge():
+    import os
+    all_results = {}
 
-df = pd.DataFrame(all_results)
-df.to_csv("/home/weili3/VLSI-LLM-Graph/predictions/summary.csv", index=False)
+    df2 = pd.read_csv("/home/weili3/VLSI-LLM/data_collection/BRIDGES.csv")
+    all_results = {"epoch":[], "run_name":[], "accuracy":[], "<10": [], "[10, 100)": [], "[100, 1000)": [], "[1000, 10000)": [], ">10000": []}
+    for file in os.listdir("/home/weili3/VLSI-LLM-Graph/predictions"):
+        if file.endswith(".txt"):
+            print(f"Processing {file}...")
+            input_file = os.path.join("/home/weili3/VLSI-LLM-Graph/predictions", file)
+            output_file = input_file.replace(".txt", ".json")
+            convert_predictions_to_json(input_file, output_file)
+            count_mismatches(output_file)
+            csv_file = output_file.replace(".json", ".csv")
+                        # Load the CSV files into DataFrames
+            df1 = pd.read_csv(csv_file)
+            result = calculate_accuracies(df1,df2)
+            print(result)
+            epoch = file.split("__")[0].split("_")[0]
+            run_name = file.split("__")[1].replace(".txt", "")
+            all_results["epoch"].append(epoch)
+            all_results["run_name"].append(run_name)
+            all_results["accuracy"].append(result["overall"])
+            all_results["<10"].append(result["<10"])
+            all_results["[10, 100)"].append(result["[10, 100)"])
+            all_results["[100, 1000)"].append(result["[100, 1000)"])
+            all_results["[1000, 10000)"].append(result["[1000, 10000)"])
+            all_results[">10000"].append(result[">10000"])
+
+            print("##################\n")
+
+    df = pd.DataFrame(all_results)
+    df.to_csv("/home/weili3/VLSI-LLM-Graph/predictions/summary.csv", index=False)
+
+
+def evaluate_csv(csv_folder, shift_netlist = 0):
+    # enumerate all csvs
+    import os
+    all_results = {}
+    all_results = {"run_name":[], "accuracy":[], "<10": [], "[10, 100)": [], "[100, 1000)": [], "[1000, 10000)": [], ">10000": []}
+    df2 = pd.read_csv("/home/weili3/VLSI-LLM/data_collection/BRIDGES.csv")
+    for file in os.listdir(csv_folder):
+        if file.endswith(".csv"):
+            print(f"Processing {file}...")
+            csv_file = os.path.join(csv_folder, file)
+            df1 = pd.read_csv(csv_file)
+            # rename key column to netlist_id
+            df1 = df1.rename(columns={"key": "netlist_id"})
+            # rename value column to correct
+            df1 = df1.rename(columns={"match": "correct"})
+            # shift netlist_id by shift_netlist
+            df1["netlist_id"] = df1["netlist_id"] + shift_netlist
+            result = calculate_accuracies(df1,df2)
+            print(result)
+            run_name = file.replace(".csv", "")
+            all_results["run_name"].append(run_name)
+            all_results["accuracy"].append(result["overall"])
+            all_results["<10"].append(result["<10"])
+            all_results["[10, 100)"].append(result["[10, 100)"])
+            all_results["[100, 1000)"].append(result["[100, 1000)"])
+            all_results["[1000, 10000)"].append(result["[1000, 10000)"])
+            all_results[">10000"].append(result[">10000"])
+
+            print("##################\n")
+    # save all_results to a csv
+    df = pd.DataFrame(all_results)
+    df.to_csv("./summary_rtl.csv",index=False)
+evaluate_bridge()
+# evaluate_csv("./data/match_results/mg_results",1000000)
+# evaluate_csv("./data/match_results")

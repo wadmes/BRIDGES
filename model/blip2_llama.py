@@ -18,7 +18,7 @@ from model.blip2 import Blip2Base
 from transformers import AutoImageProcessor, AutoTokenizer
 from transformers import AutoModel, AutoModelForCausalLM, PreTrainedModel, BitsAndBytesConfig
 from model.modeling_llama import LlamaForCausalLM
-
+import timeit
 
  
 llama_model_list = [
@@ -85,6 +85,8 @@ class Blip2Llama(Blip2Base):
                 layer.output = None
                 layer.intermediate = None
 
+
+
         ## initialize opt model
         
         self.llm_tokenizer = AutoTokenizer.from_pretrained(llm_model, use_fast=False, add_eos_token = True)
@@ -112,22 +114,25 @@ class Blip2Llama(Blip2Base):
         self.eos_token_id = self.llm_tokenizer.eos_token_id
         self.pad_token_id = self.llm_tokenizer.pad_token_id
 
-        self.llm_proj = nn.Linear(
-            self.Qformer.config.hidden_size, self.llm_model.config.hidden_size
-        )
         
         ## fixme: no prompt yet
         self.prompt = prompt
         # prompt_tokens = self.opt_tokenizer(self.prompt, return_tensors="pt")
         # self.prompt_length = prompt_tokens.attention_mask.sum(1)
-
+        if self.args.use_graph == 1:
+            self.llm_proj = nn.Linear(
+                self.Qformer.config.hidden_size, self.llm_model.config.hidden_size
+            )
     def forward(self, batch):
         # graphs, smiles_prompt_tokens, text_tokens
         graphs, prompt_tokens, text_tokens, _ = batch # text is the function description
         if self.args.use_graph == 1:
+            start = timeit.default_timer()
             graph_embeds, graph_masks = self.graph_encoder(graphs)
+            # print("Time taken to encode graph: ", timeit.default_timer() - start)
             if not self.tune_gnn:
                 graph_embeds = graph_embeds.detach()
+            start = timeit.default_timer()
             graph_embeds = self.ln_graph(graph_embeds)
             device = graph_embeds.device
             query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
@@ -138,7 +143,9 @@ class Blip2Llama(Blip2Base):
                 return_dict=True,
             )
             graph_tokens = self.llm_proj(query_output.last_hidden_state)
+            # print("Time taken for Q-former: ", timeit.default_timer() - start)
         
+        start = timeit.default_timer()
         empty_targets = torch.ones(prompt_tokens.attention_mask.shape, dtype=torch.long,device = self.llm_model.device).fill_(-100)
         targets = text_tokens.input_ids.masked_fill(text_tokens.input_ids == self.llm_tokenizer.pad_token_id, -100)
         targets = torch.cat([empty_targets, targets], dim=1)
@@ -157,82 +164,9 @@ class Blip2Llama(Blip2Base):
             labels=targets,
         )
         loss = outputs.loss
+        # print("Time taken for forward LLM: ", timeit.default_timer() - start)
         return {"loss": loss}
 
-    @torch.no_grad()
-    def generate_old(
-        self,
-        samples,
-        do_sample=False,
-        num_beams=5,
-        max_length=256,
-        min_length=1,
-        top_p=0.9,
-        repetition_penalty=1.0,
-        length_penalty=1.0,
-        num_captions=1,
-        temperature=1,
-    ):
-        """
-        Args:
-            samples (dict): A dictionary containing the following keys:
-                - image (torch.Tensor): A tensor of shape (batch_size, 3, H, W)
-            num_beams (int): Number of beams for beam search. 1 means no beam search.
-            max_length (int): The maximum length of the sequence to be generated.
-            min_length (int): The minimum length of the sequence to be generated.
-            top_p (float): The cumulative probability for nucleus sampling.
-            repetition_penalty (float): The parameter for repetition penalty. 1.0 means no penalty.
-            num_captions (int): Number of captions to be generated for each image.
-        Returns:
-            captions (list): A list of strings of length batch_size * num_captions.
-        """
-        graphs = samples['graphs']
-        prompt_tokens = samples['prompt_tokens']
-        # prompt_lens = samples['prompt_lens']
-        with self.maybe_autocast():
-            graph_embeds, graph_masks = self.graph_encoder(graphs)
-            graph_embeds = self.ln_graph(graph_embeds)
-
-            query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
-            query_output = self.Qformer.bert(
-                query_embeds=query_tokens,
-                encoder_hidden_states=graph_embeds,
-                
-                return_dict=True,
-            )
-
-            device = graph_embeds.device
-            inputs_llm = self.llm_proj(query_output.last_hidden_state)
-            atts_llm = torch.ones(inputs_llm.size()[:-1], dtype=torch.long, device=device)
-
-            attention_mask = torch.cat([atts_llm, prompt_tokens.attention_mask], dim=1)
-            
-
-            inputs_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
-            inputs_embeds = torch.cat([inputs_llm, inputs_embeds], dim=1)
-            attention_mask = torch.cat([atts_llm, prompt_tokens.attention_mask], dim=1)
-
-            outputs = self.llm_model.generate(
-                inputs_embeds=inputs_embeds,
-                attention_mask=attention_mask,
-                do_sample=do_sample,
-                top_p=top_p,
-                temperature=temperature,
-                num_beams=num_beams,
-                max_length=max_length,
-                min_length=min_length,
-                pad_token_id=self.pad_token_id,
-                eos_token_id=self.eos_token_id,
-                repetition_penalty=repetition_penalty,
-                length_penalty=length_penalty,
-                num_return_sequences=num_captions,
-                # use_cache=False,
-            )
-            # outputs[outputs == 0] = 2 # convert output id 0 to 2 (eos_token_id)
-            output_text = self.llm_tokenizer.batch_decode(outputs, skip_special_tokens=True)
-            output_text = [text.strip() for text in output_text]
-            return output_text
-        
     @torch.no_grad()
     def generate(
         self,
@@ -266,19 +200,21 @@ class Blip2Llama(Blip2Base):
         graphs = samples['graphs']
         prompt_tokens = samples['prompt_tokens']
         # prompt_lens = samples['prompt_lens']
-        graph_embeds, graph_masks = self.graph_encoder(graphs)
-        graph_embeds = self.ln_graph(graph_embeds)
+        if self.args.use_graph == 1:
+            graph_embeds, graph_masks = self.graph_encoder(graphs)
+            graph_embeds = self.ln_graph(graph_embeds)
 
-        query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
-        query_output = self.Qformer.bert(
-            query_embeds=query_tokens,
-            encoder_hidden_states=graph_embeds,
-            
-            return_dict=True,
-        )
-        graph_tokens = self.llm_proj(query_output.last_hidden_state)
+            query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
+            query_output = self.Qformer.bert(
+                query_embeds=query_tokens,
+                encoder_hidden_states=graph_embeds,
+                
+                return_dict=True,
+            )
+            graph_tokens = self.llm_proj(query_output.last_hidden_state)
         prompt_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
-        prompt_embeds[prompt_tokens.is_graph_token] = graph_tokens.flatten(0, 1)
+        if self.args.use_graph == 1:
+            prompt_embeds[prompt_tokens.is_graph_token] = graph_tokens.flatten(0, 1)
         print("Time taken to generate prompt_embeds: ", timeit.default_timer() - start)
         outputs = self.llm_model.generate(
             inputs_embeds=prompt_embeds,
@@ -326,18 +262,20 @@ class Blip2Llama(Blip2Base):
         graphs = samples['graphs']
         prompt_tokens = samples['prompt_tokens']
         # prompt_lens = samples['prompt_lens']
-        graph_embeds, graph_masks = self.graph_encoder(graphs)
-        graph_embeds = self.ln_graph(graph_embeds)
+        if self.args.use_graph == 1:
+            graph_embeds, graph_masks = self.graph_encoder(graphs)
+            graph_embeds = self.ln_graph(graph_embeds)
 
-        query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
-        query_output = self.Qformer.bert(
-            query_embeds=query_tokens,
-            encoder_hidden_states=graph_embeds,
-            return_dict=True,
-        )
-        graph_tokens = self.llm_proj(query_output.last_hidden_state)
+            query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
+            query_output = self.Qformer.bert(
+                query_embeds=query_tokens,
+                encoder_hidden_states=graph_embeds,
+                return_dict=True,
+            )
+            graph_tokens = self.llm_proj(query_output.last_hidden_state)
         prompt_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
-        prompt_embeds[prompt_tokens.is_graph_token] = graph_tokens.flatten(0, 1) # shape is [N,seq_len, D]
+        if self.args.use_graph == 1:
+            prompt_embeds[prompt_tokens.is_graph_token] = graph_tokens.flatten(0, 1) # shape is [N,seq_len, D]
         prompt_attention_mask = prompt_tokens["attention_mask"]  # Shape: (N, seq_len)
         
         device = graph_embeds.device

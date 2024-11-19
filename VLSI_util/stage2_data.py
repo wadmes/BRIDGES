@@ -188,7 +188,6 @@ Arithmetic Unit: Mathematical operations, ALUs, multipliers, dividers, and compu
 Communication Protocol Unit: Implementations of protocols like UART, I2C, SPI, or other communication interfaces
 Signal Processing Unit: Filters, FFT implementations, signal conditioning, and digital signal processing
 Clock Management Unit: Clock generators, PLL implementations, clock dividers, and timing control
-Others: Designs that don't clearly fit into the above categories
 <|eot_id|>
 <|start_header_id|>user<|end_header_id|>
 Please analyze the following Verilog graph and classify it into one of the specified design types. Its verilog code is {}. Its graph tokens are {}.<|eot_id|>
@@ -203,7 +202,6 @@ Arithmetic Unit: Mathematical operations, ALUs, multipliers, dividers, and compu
 Communication Protocol Unit: Implementations of protocols like UART, I2C, SPI, or other communication interfaces
 Signal Processing Unit: Filters, FFT implementations, signal conditioning, and digital signal processing
 Clock Management Unit: Clock generators, PLL implementations, clock dividers, and timing control
-Others: Designs that don't clearly fit into the above categories
 <|eot_id|>
 <|start_header_id|>user<|end_header_id|>
 Please analyze the following Verilog graph and classify it into one of the specified design types. Its RTL code is {}. Its graph tokens are {}.<|eot_id|>
