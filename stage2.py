@@ -99,6 +99,8 @@ def get_args():
     parser.add_argument('--val_check_interval', type=float, default=1.0)
     # use_graph, ( use graph embedding information, if not, set embeds as 0)
     parser.add_argument('--use_graph', type=int, default=1)
+    # use_qformer, ( use Q-former as cross-modal projector, if not, use a simple linear layer)
+    parser.add_argument('--use_qformer', type=int, default=1)
     args = parser.parse_args()
 
     print("=========================================")

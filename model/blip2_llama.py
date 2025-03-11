@@ -76,14 +76,15 @@ class Blip2Llama(Blip2Base):
                 self.graph_encoder.train = disabled_train
                 logging.info("freeze graph encoder")
             
-            self.Qformer, self.query_tokens = self.init_Qformer(bert_name, num_query_token, self.graph_encoder.num_features, cross_attention_freq)
-            ### remove the unused parameters
-            self.Qformer.cls = None
-            self.Qformer.bert.embeddings.word_embeddings = None
-            self.Qformer.bert.embeddings.position_embeddings = None
-            for layer in self.Qformer.bert.encoder.layer:
-                layer.output = None
-                layer.intermediate = None
+            if self.args.use_qformer == 1:
+                self.Qformer, self.query_tokens = self.init_Qformer(bert_name, num_query_token, self.graph_encoder.num_features, cross_attention_freq)
+                ### remove the unused parameters
+                self.Qformer.cls = None
+                self.Qformer.bert.embeddings.word_embeddings = None
+                self.Qformer.bert.embeddings.position_embeddings = None
+                for layer in self.Qformer.bert.encoder.layer:
+                    layer.output = None
+                    layer.intermediate = None
 
 
 
@@ -120,8 +121,9 @@ class Blip2Llama(Blip2Base):
         # prompt_tokens = self.opt_tokenizer(self.prompt, return_tensors="pt")
         # self.prompt_length = prompt_tokens.attention_mask.sum(1)
         if self.args.use_graph == 1:
+            emb_dim = self.Qformer.config.hidden_size if self.args.use_qformer == 1 else gin_hidden_dim
             self.llm_proj = nn.Linear(
-                self.Qformer.config.hidden_size, self.llm_model.config.hidden_size
+                emb_dim, self.llm_model.config.hidden_size
             )
     def forward(self, batch):
         # graphs, smiles_prompt_tokens, text_tokens
@@ -135,14 +137,19 @@ class Blip2Llama(Blip2Base):
             start = timeit.default_timer()
             graph_embeds = self.ln_graph(graph_embeds)
             device = graph_embeds.device
-            query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
-            query_output = self.Qformer.bert(
-                query_embeds=query_tokens,
-                encoder_hidden_states=graph_embeds,
-                # fixme: check whether this mask is correct
-                return_dict=True,
-            )
-            graph_tokens = self.llm_proj(query_output.last_hidden_state)
+            if self.args.use_qformer == 1:
+                query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
+                query_output = self.Qformer.bert(
+                    query_embeds=query_tokens,
+                    encoder_hidden_states=graph_embeds,
+                    # fixme: check whether this mask is correct
+                    return_dict=True,
+                )
+                graph_tokens = self.llm_proj(query_output.last_hidden_state)
+            else:
+                # query_output = graph_embeds
+                graph_tokens = self.llm_proj(graph_embeds)
+            
             # print("Time taken for Q-former: ", timeit.default_timer() - start)
         
         start = timeit.default_timer()
@@ -203,19 +210,23 @@ class Blip2Llama(Blip2Base):
         if self.args.use_graph == 1:
             graph_embeds, graph_masks = self.graph_encoder(graphs)
             graph_embeds = self.ln_graph(graph_embeds)
-
-            query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
-            query_output = self.Qformer.bert(
-                query_embeds=query_tokens,
-                encoder_hidden_states=graph_embeds,
-                
-                return_dict=True,
-            )
-            graph_tokens = self.llm_proj(query_output.last_hidden_state)
+            if self.args.use_qformer == 1: 
+                query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
+                query_output = self.Qformer.bert(
+                    query_embeds=query_tokens,
+                    encoder_hidden_states=graph_embeds,
+                    
+                    return_dict=True,
+                )
+                graph_tokens = self.llm_proj(query_output.last_hidden_state)
+            else:
+                graph_tokens = self.llm_proj(graph_embeds)
         prompt_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
         if self.args.use_graph == 1:
             prompt_embeds[prompt_tokens.is_graph_token] = graph_tokens.flatten(0, 1)
-        print("Time taken to generate prompt_embeds: ", timeit.default_timer() - start)
+        # print("Time taken to generate prompt_embeds: ", timeit.default_timer() - start)
+            
+        
         outputs = self.llm_model.generate(
             inputs_embeds=prompt_embeds,
             attention_mask=prompt_tokens.attention_mask,
@@ -265,14 +276,16 @@ class Blip2Llama(Blip2Base):
         if self.args.use_graph == 1:
             graph_embeds, graph_masks = self.graph_encoder(graphs)
             graph_embeds = self.ln_graph(graph_embeds)
-
-            query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
-            query_output = self.Qformer.bert(
-                query_embeds=query_tokens,
-                encoder_hidden_states=graph_embeds,
-                return_dict=True,
-            )
-            graph_tokens = self.llm_proj(query_output.last_hidden_state)
+            if self.args.use_qformer == 1:
+                query_tokens = self.query_tokens.expand(graph_embeds.shape[0], -1, -1)
+                query_output = self.Qformer.bert(
+                    query_embeds=query_tokens,
+                    encoder_hidden_states=graph_embeds,
+                    return_dict=True,
+                )
+                graph_tokens = self.llm_proj(query_output.last_hidden_state)
+            else:
+                graph_tokens = self.llm_proj(graph_embeds)
         prompt_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
         if self.args.use_graph == 1:
             prompt_embeds[prompt_tokens.is_graph_token] = graph_tokens.flatten(0, 1) # shape is [N,seq_len, D]

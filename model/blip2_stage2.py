@@ -306,6 +306,7 @@ class Blip2Stage2(pl.LightningModule):
         parser.add_argument('--cross_attention_freq', type=int, default=2)
         parser.add_argument('--num_query_token', type=int, default=8)
         # OPT
+
         parser.add_argument('--opt_model', type=str, default="meta-llama/Llama-3.2-3B-Instruct", help='LLM name')
         # parser.add_argument('--prompt', type=str, default='a molecule of ')
         parser.add_argument('--num_beams', type=int, default=2)
@@ -316,6 +317,7 @@ class Blip2Stage2(pl.LightningModule):
         parser.add_argument('--peft_config', type=str, default=None)
         parser.add_argument('--peft_dir', type=str, default='')
 
+        
         parser.add_argument('--save_every_n_epochs', type=int, default=1)
 
         ## lora config
