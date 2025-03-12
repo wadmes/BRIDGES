@@ -214,9 +214,9 @@ Please analyze the following Verilog graph and classify it into one of the speci
         max_rtlid = 0
         for dataset_idx, ds_path in enumerate(args.dataset_path):
             
-            this_train = torch.load(ds_path.replace('.pt', '_train.pt'))
-            this_val = torch.load(ds_path.replace('.pt', '_val.pt'))
-            this_test = torch.load(ds_path.replace('.pt', '_test.pt'))
+            this_train = torch.load(ds_path.replace('.pt', '_train.pt'),weights_only=False)
+            this_val = torch.load(ds_path.replace('.pt', '_val.pt'),weights_only=False)
+            this_test = torch.load(ds_path.replace('.pt', '_test.pt'),weights_only=False)
             if args.task == 'type_pred':
                 # remove graph with empty consistent_label
                 for graphs in [this_train, this_val, this_test]:
