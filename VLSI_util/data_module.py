@@ -106,9 +106,9 @@ class Stage1DM_v2(LightningDataModule):
             max_rtlid = 0
             for ds_path in dataset_path:
                 ds = torch.load(ds_path)
-                this_train = torch.load(ds_path.replace('.pt', '_train.pt'))
-                this_val = torch.load(ds_path.replace('.pt', '_val.pt'))
-                this_test = torch.load(ds_path.replace('.pt', '_test.pt'))
+                this_train = torch.load(ds_path.replace('.pt', '_train.pt'),weights_only=False)
+                this_val = torch.load(ds_path.replace('.pt', '_val.pt'),weights_only=False)
+                this_test = torch.load(ds_path.replace('.pt', '_test.pt',weights_only=False))
                 for split_dataset in [this_train, this_val, this_test]:
                     for graph in split_dataset:
                         graph.rtl_id += max_rtlid

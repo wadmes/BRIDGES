@@ -20,6 +20,6 @@ srun --time 1-23 --mem=400G --cpus-per-gpu=4 --pty -p HGPU --gres=gpu:H200:2 /bi
 # srun --time 3-23 --mem=400G --cpus-per-gpu=4 --pty -p HGPU --gres=gpu:H200:${1:-1} /bin/bash
 # -p HGPU
 # no q-former - type prediction
-srun --time 3-23 --mem=400G --cpus-per-gpu=4 --pty --gres gpu:H100:1 python stage2.py --tune_gnn --inference_batch_size 4 --batch_size 8 --llm_tune --filename 3B-lora_no_qformer --use_qformer 0 --num_query_token 4 &
+srun --time 3-23 --mem=400G --cpus-per-gpu=4 --pty --gres gpu:H100:1 python stage2.py --tune_gnn --inference_batch_size 2 --batch_size 4 --llm_tune --filename 3B-lora_no_qformer --use_qformer 0 --num_query_token 4 &
 # no q-former - func desc
 srun --time 3-23 --mem=400G --cpus-per-gpu=4 --pty --gres gpu:H100:2 python stage2.py --tune_gnn --inference_batch_size 8 --batch_size 8 --llm_tune --filename func_desc_no_qformer --task func_desc --add_file rtl --use_qformer 0 --num_query_token 4 &

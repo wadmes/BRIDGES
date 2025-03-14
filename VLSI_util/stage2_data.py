@@ -292,7 +292,7 @@ Please analyze the following Verilog graph and classify it into one of the speci
         parser.add_argument('--num_workers', type=int, default=4)
         parser.add_argument('--batch_size', type=int, default=8)
         parser.add_argument('--inference_batch_size', type=int, default=8)
-        parser.add_argument("--dataset_path", action="extend", nargs="+", type=str, default=["/scratch/weili3/RTLCoder26532.pt","/scratch/weili3/MGVerilog11144.pt"])
+        parser.add_argument("--dataset_path", action="extend", nargs="+", type=str, default=["/home/weili3/VLSI-LLM-Graph/VLSI_util/RTLCoder26532.pt","/home/weili3/VLSI-LLM-Graph/VLSI_util/MGVerilog11144.pt"])
         parser.add_argument('--text_max_len', type=int, default=256)
         parser.add_argument('--prompt', type=str, default='The graph of this module is [START_NETLIST_GRAPH]{}[END__NETLIST_GRAPH].')
         # task, default is 'type_pred'

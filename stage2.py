@@ -44,7 +44,7 @@ def main(args):
         print(f"loaded stage2 model from {args.stage2_path}")
     elif args.stage1_path:
         model = Blip2Stage2(args)
-        model.load_from_stage1_checkpoint(args.stage1_path)
+        model.load_from_stage1_checkpoint(args.stage1_path,use_qformer=args.use_qformer)
         print(f"loaded stage1 model from {args.stage1_path}")
     else:
         model = Blip2Stage2(args)

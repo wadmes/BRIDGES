@@ -81,7 +81,7 @@ args = parser.parse_args()
 
 
 # load the graph
-ds = torch.load(args.graph_path)
+ds = torch.load(args.graph_path,weights_only=False)
 ds  = random_split_by_rtl([args.train_ratio, (1-args.train_ratio)/2, (1-args.train_ratio)/2], ds['rtl_id_list'], ds['graphs'], args.seed)
 # save the data to the same directory but rename as name_train.pt, name_val.pt, name_test.pt
 torch.save(ds[0], args.graph_path.replace('.pt', '_train.pt'))

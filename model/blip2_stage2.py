@@ -19,7 +19,7 @@ def load_ignore_unexpected(model, state_dict):
     state_dict = {k: v for k, v in state_dict.items() if k in keys}
     
     ## try to print keys that are not included
-    model.load_state_dict(state_dict, strict=True)
+    model.load_state_dict(state_dict, strict=True) # for Q-former, it is not strict (we have expriments without Q-former)
 
 def get_module_state_dict(state_dict, module_name):
     module_state_dict = {}
@@ -75,17 +75,19 @@ class Blip2Stage2(pl.LightningModule):
             self.candidate_tokens = self.blip2opt.llm_tokenizer(self.candidates,truncation=True, padding='longest', return_tensors='pt', return_attention_mask=True,add_special_tokens=False).to("cuda")
     
 
-    def load_from_stage1_checkpoint(self, path):
+    def load_from_stage1_checkpoint(self, path,use_qformer = 1):
         ckpt = torch.load(path, map_location='cpu')
         state_dict = ckpt['state_dict']
         graph_encoder_dict = get_module_state_dict(state_dict, 'blip2qformer.graph_encoder')
         qformer_dict = get_module_state_dict(state_dict, 'blip2qformer.Qformer')
         ln_graph_dict = get_module_state_dict(state_dict, 'blip2qformer.ln_graph')
         qs_weight = get_module_state_dict(state_dict, 'blip2qformer.query_tokens')
-        load_ignore_unexpected(self.blip2opt.Qformer, qformer_dict)
+        if use_qformer:
+            load_ignore_unexpected(self.blip2opt.Qformer, qformer_dict)
+            self.blip2opt.query_tokens.data.copy_(qs_weight)
         self.blip2opt.graph_encoder.load_state_dict(graph_encoder_dict)
         self.blip2opt.ln_graph.load_state_dict(ln_graph_dict)
-        self.blip2opt.query_tokens.data.copy_(qs_weight)
+        
         return self
     
     # def load_from_stage1_checkpoint(self, path):
