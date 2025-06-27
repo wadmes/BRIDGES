@@ -20,6 +20,8 @@ python -m pip install -r requirements.txt
 ## Dataset and Generation Flow
 `data_collection/` contains the BRIDGES data generation flow.
 
+> The dataset has been temporarily removed from Hugging Face due to a pending license review with the EDA tool provider.
+
 BRIDGES data can be found [here](https://huggingface.co/datasets/WillZ0123/BRIDGES/tree/main).
 
 
