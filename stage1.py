@@ -44,7 +44,11 @@ def main(args):
     
     # logger = CSVLogger(save_dir=f'./all_checkpoints/{args.filename}/')
     logger = WandbLogger(project='LLM-graph-stage1-v3-1115', name = args.filename)
-    trainer = Trainer(fast_dev_run = False,precision=args.precision, max_epochs=args.max_epochs, val_check_interval=args.val_check_interval, callbacks=callbacks, logger = logger)
+    if args.estimate_PPA == 1:
+        # for PPA result, we quickly skip training, and check the performance
+        trainer = Trainer(limit_train_batches = 1, fast_dev_run = False,precision=args.precision, max_epochs=1, val_check_interval=args.val_check_interval, logger = logger)
+    else:
+        trainer = Trainer(fast_dev_run = False,precision=args.precision, max_epochs=args.max_epochs, val_check_interval=args.val_check_interval, callbacks=callbacks, logger = logger)
     if args.mode == 'train':
         trainer.fit(model, datamodule=dm)
     elif args.mode == 'eval':

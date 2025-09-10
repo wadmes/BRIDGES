@@ -104,11 +104,15 @@ class Stage1DM_v2(LightningDataModule):
             val_graphs = []
             test_graphs = []
             max_rtlid = 0
+            if args.estimate_PPA == 1:
+                # for PPA task, we only use RTLCoder dataset
+                dataset_path = ["/home/weili3/VLSI-LLM-Graph/VLSI_util/RTLCoder26532_design_info.pt"]
             for ds_path in dataset_path:
-                ds = torch.load(ds_path)
+                print(ds_path)
                 this_train = torch.load(ds_path.replace('.pt', '_train.pt'),weights_only=False)
                 this_val = torch.load(ds_path.replace('.pt', '_val.pt'),weights_only=False)
-                this_test = torch.load(ds_path.replace('.pt', '_test.pt',weights_only=False))
+                this_test = torch.load(ds_path.replace('.pt', '_test.pt'),weights_only=False)
+                ds = torch.load(ds_path,weights_only=False)
                 for split_dataset in [this_train, this_val, this_test]:
                     for graph in split_dataset:
                         graph.rtl_id += max_rtlid

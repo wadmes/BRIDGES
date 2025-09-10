@@ -17,3 +17,7 @@ srun --time 3-23 --mem=400G --cpus-per-gpu=4 --pty --gres gpu:H100:1 --reservati
 srun --time 3-23 --mem=400G --cpus-per-gpu=4 --pty --gres gpu:H100:1 --reservation=ConfNov19 python stage1.py --gtm --lm --tune_gnn --filename train_0.1_dim_256 --training_data_used 0.1 --gin_hidden_dim 256 &
 srun --time 3-23 --mem=400G --cpus-per-gpu=4 --pty --gres gpu:H100:1 --reservation=ConfNov19 python stage1.py --gtm --lm --tune_gnn --filename train_0.5_dim_256 --training_data_used 0.5 --gin_hidden_dim 256&
 srun --time 3-23 --mem=400G --cpus-per-gpu=4 --pty --gres gpu:H100:1 --reservation=ConfNov19 python stage1.py --gtm --lm --tune_gnn  --filename dim_256 --gin_hidden_dim 256 &
+
+
+
+python stage1.py --gtm --lm --tune_gnn --filename PPA_graph --estimate_PPA 1 --init_checkpoint "all_checkpoints/stage1_test/1113.ckpt"
